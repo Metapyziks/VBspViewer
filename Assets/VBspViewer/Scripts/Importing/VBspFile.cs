@@ -430,9 +430,8 @@ namespace VBspViewer.Importing
 
             public static implicit operator Color(LightmapSample sample)
             {
-                return new Color32((byte) (sample.R << sample.Exponent),
-                    (byte) (sample.G << sample.Exponent),
-                    (byte) (sample.B << sample.Exponent), 255);
+                var mul = Mathf.Pow(2f, sample.Exponent) / 256f;
+                return new Color(sample.R * mul, sample.G * mul, sample.B * mul, 1f);
             }
 
             public byte R;
@@ -517,8 +516,14 @@ namespace VBspViewer.Importing
         [Lump(Type = LumpType.LUMP_PRIMINDICES)]
         private ushort[] PrimitiveIndices { get; set; }
 
-        [Lump(Type = LumpType.LUMP_LIGHTING_HDR)]
+        [Lump(Type = LumpType.LUMP_LIGHTING)]
         private LightmapSample[] LightmapSamples { get; set; }
+
+        [Lump(Type = LumpType.LUMP_LIGHTING_HDR)]
+        private LightmapSample[] LightmapSamplesHdr { get; set; }
+        
+        [Lump(Type = LumpType.LUMP_FACES_HDR)]
+        private Face[] FacesHdr { get; set; }
 
         private int _lightmapSize = -1;
         
@@ -545,7 +550,7 @@ namespace VBspViewer.Importing
             if (_lightmapSize != -1) return _lightmapSize;
 
             var maxPos = 1;
-            foreach (var face in Faces)
+            foreach (var face in FacesHdr)
             {
                 if (face.LightOffset == -1) continue;
                 var max = Math.Max(face.LightMapOffsetX + face.LightMapSizeX, face.LightMapOffsetY + face.LightMapSizeY);
@@ -560,9 +565,7 @@ namespace VBspViewer.Importing
             var size = GetLightmapSize();
             var texture = new Texture2D(size, size, TextureFormat.RGB24, false);
 
-            var writer = File.CreateText("lightmap.txt");
-
-            foreach (var face in Faces)
+            foreach (var face in FacesHdr)
             {
                 if (face.LightOffset == -1) continue;
 
@@ -572,16 +575,13 @@ namespace VBspViewer.Importing
                 for (var x = 0; x < samplesWidth; ++x)
                 for (var y = 0; y < samplesHeight; ++y)
                 {
-                    var index = face.LightOffset + x + y*samplesWidth;
-                    var sample = LightmapSamples[index];
+                    var index = (face.LightOffset >> 2) + x + y*samplesWidth;
 
-                    writer.WriteLine(sample.Exponent);
-                        
+                    var sample = LightmapSamplesHdr[index];
+
                     texture.SetPixel(face.LightMapOffsetX + x, face.LightMapOffsetY + y, sample);
                 }
             }
-
-            writer.Dispose();
 
             texture.Apply();
             File.WriteAllBytes("lightmap.png", texture.EncodeToPNG());
@@ -698,7 +698,7 @@ namespace VBspViewer.Importing
             var usedEdges = new HashSet<int>();
             var primitiveIndices = new List<int>();
 
-            foreach (var face in Faces)
+            foreach (var face in FacesHdr)
             {
                 var plane = Planes[face.PlaneNum];
                 var normal = plane.Normal;
