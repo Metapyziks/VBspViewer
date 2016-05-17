@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using System.Runtime.InteropServices;
 
 namespace VBspViewer.Importing.Structures
@@ -28,15 +27,6 @@ namespace VBspViewer.Importing.Structures
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct TexAxis
     {
-        public static TexAxis Read(BinaryReader reader)
-        {
-            return new TexAxis
-            {
-                Normal = Vector.Read(reader),
-                Offset = reader.ReadSingle()
-            };
-        }
-
         public Vector Normal;
         public float Offset;
     }
@@ -44,21 +34,6 @@ namespace VBspViewer.Importing.Structures
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct TextureInfo
     {
-        public static TextureInfo Read(BinaryReader reader)
-        {
-            return new TextureInfo
-            {
-                TextureUAxis = TexAxis.Read(reader),
-                TextureVAxis = TexAxis.Read(reader),
-
-                LightmapUAxis = TexAxis.Read(reader),
-                LightmapVAxis = TexAxis.Read(reader),
-
-                Flags = (SurfFlags) reader.ReadInt32(),
-                TexData = reader.ReadInt32()
-            };
-        }
-
         public TexAxis TextureUAxis;
         public TexAxis TextureVAxis;
 

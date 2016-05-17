@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -8,17 +7,6 @@ namespace VBspViewer.Importing.Structures
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct LightmapSample
     {
-        public static LightmapSample Read(BinaryReader reader)
-        {
-            return new LightmapSample
-            {
-                R = reader.ReadByte(),
-                G = reader.ReadByte(),
-                B = reader.ReadByte(),
-                Exponent = reader.ReadSByte()
-            };
-        }
-
         public static implicit operator Color(LightmapSample sample)
         {
             var mul = (float) Math.Pow(2d, sample.Exponent) / 255f;

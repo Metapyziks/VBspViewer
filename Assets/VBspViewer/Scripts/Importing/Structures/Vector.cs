@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -8,16 +7,6 @@ namespace VBspViewer.Importing.Structures
     [StructLayout(LayoutKind.Sequential)]
     public struct Vector : IEquatable<Vector>
     {
-        public static Vector Read(BinaryReader reader)
-        {
-            return new Vector
-            {
-                X = reader.ReadSingle(),
-                Y = reader.ReadSingle(),
-                Z = reader.ReadSingle()
-            };
-        }
-
         public static implicit operator Vector3(Vector vector)
         {
             return new Vector3(vector.X, vector.Z, vector.Y);

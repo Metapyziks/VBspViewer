@@ -19,44 +19,28 @@ namespace VBspViewer.Importing
             _header = Header.Read(reader);
 
             var delegates = GetReadLumpDelegates();
-
-            const int bufferSize = 8192;
-            var buffer = new byte[bufferSize];
-
-            using (var tempStream = new MemoryStream())
+            var srcBuffer = new byte[0];
+            
+            for (var lumpIndex = 0; lumpIndex < Header.LumpInfoCount; ++lumpIndex)
             {
-                var tempReader = new BinaryReader(tempStream);
+                ReadLumpDelegate deleg;
+                if (!delegates.TryGetValue((LumpType) lumpIndex, out deleg)) continue;
 
-                for (var lumpIndex = 0; lumpIndex < Header.LumpInfoCount; ++lumpIndex)
-                {
-                    ReadLumpDelegate deleg;
-                    if (!delegates.TryGetValue((LumpType) lumpIndex, out deleg)) continue;
-
-                    var info = _header.Lumps[lumpIndex];
+                var info = _header.Lumps[lumpIndex];
                     
-                    Debug.LogFormat("{0} Start: 0x{1:x}, Length: 0x{2:x}", (LumpType) lumpIndex, info.Offset, info.Length);
+                Debug.LogFormat("{0} Start: 0x{1:x}, Length: 0x{2:x}", (LumpType) lumpIndex, info.Offset, info.Length);
 
-                    tempStream.Seek(0, SeekOrigin.Begin);
-                    tempStream.SetLength(0);
-
-                    stream.Seek(info.Offset, SeekOrigin.Begin);
-
-                    for (var total = 0; total < info.Length;)
-                    {
-                        var toRead = Math.Min(info.Length - total, bufferSize);
-                        var read = stream.Read(buffer, 0, toRead);
-
-                        tempStream.Write(buffer, 0, read);
-
-                        total += read;
-                    }
-
-                    tempStream.Seek(0, SeekOrigin.Begin);
-
-                    Debug.Assert(tempStream.Length == info.Length);
-
-                    deleg(this, info, tempReader);
+                if (srcBuffer.Length < info.Length)
+                {
+                    srcBuffer = new byte[Mathf.NextPowerOfTwo(info.Length)];
                 }
+
+                stream.Seek(info.Offset, SeekOrigin.Begin);
+                var read = stream.Read(srcBuffer, 0, info.Length);
+
+                Debug.Assert(read == info.Length);
+
+                deleg(this, srcBuffer, info.Length);
             }
         }
         
@@ -98,9 +82,7 @@ namespace VBspViewer.Importing
 
         [Lump(Type = LumpType.LUMP_TEXINFO)]
         private TextureInfo[] TexInfos { get; set; }
-
-        private Vector2 _lightmapSize;
-
+        
         private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>(); 
 
         public Texture2D GenerateLightmap()
@@ -136,9 +118,6 @@ namespace VBspViewer.Importing
             _lightmapRects.Clear();
             var rects = texture.PackTextures(textures, 0);
 
-            _lightmapSize.x = texture.width;
-            _lightmapSize.y = texture.height;
-
             texIndex = 0;
             for (var faceIndex = 0; faceIndex < FacesHdr.Length; ++faceIndex)
             {
@@ -150,8 +129,6 @@ namespace VBspViewer.Importing
             }
 
             texture.Apply();
-            File.WriteAllBytes("lightmap.png", texture.EncodeToPNG());
-            
             return texture;
         }
 
@@ -167,11 +144,11 @@ namespace VBspViewer.Importing
             var mesh = new Mesh();
             var primitiveIndices = new List<int>();
 
-            const SurfFlags ignoreFlags = SurfFlags.NODRAW | SurfFlags.SKIP | SurfFlags.SKY | SurfFlags.SKY2D;
+            const SurfFlags ignoreFlags = SurfFlags.NODRAW | SurfFlags.SKIP | SurfFlags.SKY | SurfFlags.SKY2D | SurfFlags.HINT | SurfFlags.TRIGGER;
 
             foreach (var faceIndex in faceIndices)
             {
-                var face = Faces[faceIndex];
+                var face = FacesHdr[faceIndex];
                 var plane = Planes[face.PlaneNum];
                 var tex = TexInfos[face.TexInfo];
 
@@ -196,7 +173,7 @@ namespace VBspViewer.Importing
                         lightmapUv.y -= face.LightMapOffsetY - .5f;
                         lightmapUv.x /= face.LightMapSizeX + 1;
                         lightmapUv.y /= face.LightMapSizeY + 1;
-
+                        
                         lightmapUv.x *= lightmapRect.width;
                         lightmapUv.y *= lightmapRect.height;
                         lightmapUv.x += lightmapRect.x;

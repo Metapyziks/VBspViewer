@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Runtime.InteropServices;
 
 namespace VBspViewer.Importing.Structures
 {
@@ -14,11 +15,8 @@ namespace VBspViewer.Importing.Structures
                 Version = reader.ReadInt32()
             };
 
-            var lumps = new LumpInfo[LumpInfoCount];
-            for (var i = 0; i < LumpInfoCount; ++i)
-            {
-                lumps[i] = LumpInfo.Read(reader);
-            }
+            var lumpInfoBytes = reader.ReadBytes(LumpInfoCount*Marshal.SizeOf(typeof (LumpInfo)));
+            var lumps = ReadLumpWrapper<LumpInfo>.ReadLump(lumpInfoBytes, lumpInfoBytes.Length);
 
             header.Lumps = lumps;
             header.MapRevision = reader.ReadInt32();
