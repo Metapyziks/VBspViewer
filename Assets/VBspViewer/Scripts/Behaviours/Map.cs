@@ -24,12 +24,20 @@ namespace VBspViewer.Behaviours
             using (var stream = File.OpenRead(filePath))
             {
                 _bspFile = new VBspFile(stream);
-                var mesh = _bspFile.GenerateMesh();
                 Lightmap = _bspFile.GenerateLightmap();
+                var meshes = _bspFile.GenerateMeshes();
 
-                var modelChild = new GameObject("Model", typeof(MeshFilter), typeof(MeshRenderer));
-                modelChild.GetComponent<MeshFilter>().sharedMesh = mesh;
-                modelChild.GetComponent<MeshRenderer>().sharedMaterial = Material;
+                Material.mainTexture = Lightmap;
+
+                var index = 0;
+                foreach (var mesh in meshes)
+                {
+                    var modelChild = new GameObject("Model " + index++, typeof(MeshFilter), typeof(MeshRenderer));
+                    modelChild.transform.SetParent(transform, true);
+
+                    modelChild.GetComponent<MeshFilter>().sharedMesh = mesh;
+                    modelChild.GetComponent<MeshRenderer>().sharedMaterial = Material;
+                }
             }
         }
     }

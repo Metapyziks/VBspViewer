@@ -96,28 +96,21 @@ namespace VBspViewer.Importing
         [Lump(Type = LumpType.LUMP_FACES_HDR)]
         private Face[] FacesHdr { get; set; }
 
-        private int _lightmapSize = -1;
-        
-        private int GetLightmapSize()
-        {
-            if (_lightmapSize != -1) return _lightmapSize;
+        [Lump(Type = LumpType.LUMP_TEXINFO)]
+        private TextureInfo[] TexInfos { get; set; }
 
-            var maxPos = 1;
-            foreach (var face in FacesHdr)
-            {
-                if (face.LightOffset == -1) continue;
-                var max = Math.Max(face.LightMapOffsetX + face.LightMapSizeX, face.LightMapOffsetY + face.LightMapSizeY);
-                maxPos = Math.Max(max, maxPos);
-            }
+        private Vector2 _lightmapSize;
 
-            return _lightmapSize = Mathf.NextPowerOfTwo(maxPos);
-        }
+        private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>(); 
 
         public Texture2D GenerateLightmap()
         {
-            var size = GetLightmapSize();
-            var texture = new Texture2D(size, size, TextureFormat.RGB24, false);
+            var texture = new Texture2D(1, 1, TextureFormat.RGB24, false);
 
+            var litFaces = FacesHdr.Count(x => x.LightOffset != -1);
+            var textures = new Texture2D[litFaces];
+
+            var texIndex = 0;
             foreach (var face in FacesHdr)
             {
                 if (face.LightOffset == -1) continue;
@@ -125,6 +118,8 @@ namespace VBspViewer.Importing
                 var samplesWidth = face.LightMapSizeX + 1;
                 var samplesHeight = face.LightMapSizeY + 1;
 
+                var subTex = new Texture2D(samplesWidth, samplesHeight, TextureFormat.RGB24, false);
+                
                 for (var x = 0; x < samplesWidth; ++x)
                 for (var y = 0; y < samplesHeight; ++y)
                 {
@@ -132,8 +127,26 @@ namespace VBspViewer.Importing
 
                     var sample = LightmapSamplesHdr[index];
 
-                    texture.SetPixel(face.LightMapOffsetX + x, face.LightMapOffsetY + y, sample);
+                    subTex.SetPixel(x, y, sample);
                 }
+
+                textures[texIndex++] = subTex;
+            }
+
+            _lightmapRects.Clear();
+            var rects = texture.PackTextures(textures, 0);
+
+            _lightmapSize.x = texture.width;
+            _lightmapSize.y = texture.height;
+
+            texIndex = 0;
+            for (var faceIndex = 0; faceIndex < FacesHdr.Length; ++faceIndex)
+            {
+                var face = FacesHdr[faceIndex];
+                if (face.LightOffset == -1) continue;
+
+                var rect = rects[texIndex++];
+                _lightmapRects.Add(faceIndex, rect);
             }
 
             texture.Apply();
@@ -141,18 +154,29 @@ namespace VBspViewer.Importing
             
             return texture;
         }
-        
-        public Mesh GenerateMesh()
+
+        private static Vector2 GetUv(Vector3 pos, TexAxis uAxis, TexAxis vAxis)
+        {
+            return new Vector2(
+                Vector3.Dot(pos, uAxis.Normal) + uAxis.Offset,
+                Vector3.Dot(pos, vAxis.Normal) + vAxis.Offset);
+        }
+
+        private Mesh GenerateMesh(MeshBuilder meshGen, IEnumerable<int> faceIndices)
         {
             var mesh = new Mesh();
-            var meshGen = new MeshBuilder();
-
-            var usedEdges = new HashSet<int>();
             var primitiveIndices = new List<int>();
 
-            foreach (var face in FacesHdr)
+            const SurfFlags ignoreFlags = SurfFlags.NODRAW | SurfFlags.SKIP | SurfFlags.SKY | SurfFlags.SKY2D;
+
+            foreach (var faceIndex in faceIndices)
             {
+                var face = Faces[faceIndex];
                 var plane = Planes[face.PlaneNum];
+                var tex = TexInfos[face.TexInfo];
+
+                if ((tex.Flags & ignoreFlags) != 0) continue;
+
                 var normal = plane.Normal;
 
                 meshGen.StartFace();
@@ -161,11 +185,25 @@ namespace VBspViewer.Importing
                 {
                     var surfEdge = SurfEdges[surfId];
                     var edgeIndex = Math.Abs(surfEdge);
-                    usedEdges.Add(edgeIndex);
                     var edge = Edges[edgeIndex];
                     var vert = Vertices[surfEdge >= 0 ? edge.A : edge.B];
+                    var lightmapUv = GetUv(vert, tex.LightmapUAxis, tex.LightmapVAxis);
 
-                    meshGen.AddVertex(vert, normal);
+                    Rect lightmapRect;
+                    if (_lightmapRects.TryGetValue(faceIndex, out lightmapRect))
+                    {
+                        lightmapUv.x -= face.LightMapOffsetX - .5f;
+                        lightmapUv.y -= face.LightMapOffsetY - .5f;
+                        lightmapUv.x /= face.LightMapSizeX + 1;
+                        lightmapUv.y /= face.LightMapSizeY + 1;
+
+                        lightmapUv.x *= lightmapRect.width;
+                        lightmapUv.y *= lightmapRect.height;
+                        lightmapUv.x += lightmapRect.x;
+                        lightmapUv.y += lightmapRect.y;
+                    }
+
+                    meshGen.AddVertex(vert, normal, lightmapUv);
                 }
 
                 if (face.NumPrimitives == 0)
@@ -196,6 +234,26 @@ namespace VBspViewer.Importing
             meshGen.CopyToMesh(mesh);
 
             return mesh;
+        }
+        
+        public Mesh[] GenerateMeshes()
+        {
+            var meshGen = new MeshBuilder();
+            const int facesPerMesh = 1024;
+
+            var meshCount = (FacesHdr.Length + facesPerMesh - 1)/facesPerMesh;
+            var meshes = new Mesh[meshCount];
+
+            for (var meshIndex = 0; meshIndex < meshCount; ++meshIndex)
+            {
+                var firstFace = meshIndex * facesPerMesh;
+                var endFace = Math.Min(firstFace+facesPerMesh, FacesHdr.Length);
+
+                meshGen.Clear();
+                meshes[meshIndex] = GenerateMesh(meshGen, Enumerable.Range(firstFace, endFace - firstFace));
+            }
+
+            return meshes;
         }
     }
 }

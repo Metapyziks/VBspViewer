@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -20,8 +21,12 @@ namespace VBspViewer.Importing.Structures
 
         public static implicit operator Color(LightmapSample sample)
         {
-            var mul = Mathf.Pow(2f, sample.Exponent) / 256f;
-            return new Color(sample.R * mul, sample.G * mul, sample.B * mul, 1f);
+            var mul = (float) Math.Pow(2d, sample.Exponent) / 255f;
+            return new Color(
+                Mathf.Clamp(Mathf.Pow(mul * sample.R, 0.6f), 0f, 1f),
+                Mathf.Clamp(Mathf.Pow(mul * sample.G, 0.6f), 0f, 1f),
+                Mathf.Clamp(Mathf.Pow(mul * sample.B, 0.6f), 0f, 1f),
+                1f);
         }
 
         public byte R;
