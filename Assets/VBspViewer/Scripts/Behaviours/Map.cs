@@ -9,8 +9,7 @@ namespace VBspViewer.Behaviours
     {
         public string FilePath;
         public Material Material;
-
-        public bool ShowDebugEdges;
+        
         public Texture2D Lightmap;
 
         private VBspFile _bspFile;
@@ -32,12 +31,6 @@ namespace VBspViewer.Behaviours
                 modelChild.GetComponent<MeshFilter>().sharedMesh = mesh;
                 modelChild.GetComponent<MeshRenderer>().sharedMaterial = Material;
             }
-        }
-
-        [UsedImplicitly]
-        private void Update()
-        {
-            if (ShowDebugEdges) _bspFile.DebugRenderEdges();
         }
     }
 }
