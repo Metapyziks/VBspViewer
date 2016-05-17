@@ -6,9 +6,9 @@ namespace VBspViewer.Importing.Structures
     public struct DispSubNeighbor
     {
         public ushort NeighborIndex;
-        public sbyte NeighborOrientation;
-        public sbyte Span;
-        public sbyte NeighborSpan;
+        public byte NeighborOrientation;
+        public byte Span;
+        public byte NeighborSpan;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -40,28 +40,26 @@ namespace VBspViewer.Importing.Structures
         public float SmoothingAngle;
         public int Contents;
         public ushort MapFace;
+
         public int LightmapAlphaStart;
+        public short Unknown0;
         public int LightmapSamplePositionStart;
 
-        public DispNeighbor EdgeNeighbor0;
-        public DispNeighbor EdgeNeighbor1;
-        public DispNeighbor EdgeNeighbor2;
-        public DispNeighbor EdgeNeighbor3;
-
-        public DispCornerNeighbors CornerNeighbor0;
-        public DispCornerNeighbors CornerNeighbor1;
-        public DispCornerNeighbors CornerNeighbor2;
-        public DispCornerNeighbors CornerNeighbor3;
-
-        public uint AllowedVerts0;
-        public uint AllowedVerts1;
-        public uint AllowedVerts2;
-        public uint AllowedVerts3;
-        public uint AllowedVerts4;
-        public uint AllowedVerts5;
-        public uint AllowedVerts6;
-        public uint AllowedVerts7;
-        public uint AllowedVerts8;
-        public uint AllowedVerts9;
+        public long Unknown1;
+        public long Unknown2;
+        public long Unknown3;
+        public long Unknown4;
+        public long Unknown5;
+        public long Unknown6;
+        public long Unknown7;
+        public long Unknown8;
+        public long Unknown9;
+        public long Unknown10;
+        public long Unknown11;
+        public long Unknown12;
+        public long Unknown13;
+        public long Unknown14;
+        public long Unknown15;
+        public long Unknown16;
     }
 }

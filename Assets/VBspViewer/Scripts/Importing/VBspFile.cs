@@ -82,6 +82,9 @@ namespace VBspViewer.Importing
 
         [Lump(Type = LumpType.LUMP_TEXINFO)]
         private TextureInfo[] TexInfos { get; set; }
+
+        [Lump(Type = LumpType.LUMP_DISPINFO)]
+        private DispInfo[] DispInfos { get; set; }
         
         private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>(); 
 
@@ -151,10 +154,9 @@ namespace VBspViewer.Importing
                 var face = FacesHdr[faceIndex];
                 var plane = Planes[face.PlaneNum];
                 var tex = TexInfos[face.TexInfo];
+                var normal = plane.Normal;
 
                 if ((tex.Flags & ignoreFlags) != 0) continue;
-
-                var normal = plane.Normal;
 
                 meshGen.StartFace();
 
@@ -171,8 +173,8 @@ namespace VBspViewer.Importing
                     {
                         lightmapUv.x -= face.LightMapOffsetX - .5f;
                         lightmapUv.y -= face.LightMapOffsetY - .5f;
-                        lightmapUv.x /= face.LightMapSizeX + 1;
-                        lightmapUv.y /= face.LightMapSizeY + 1;
+                        lightmapUv.x /= face.LightMapSizeX + 1f;
+                        lightmapUv.y /= face.LightMapSizeY + 1f;
                         
                         lightmapUv.x *= lightmapRect.width;
                         lightmapUv.y *= lightmapRect.height;
