@@ -7,6 +7,11 @@ namespace VBspViewer.Importing.Structures
     [StructLayout(LayoutKind.Sequential)]
     public struct Vector : IEquatable<Vector>
     {
+        public static Vector operator -(Vector vector)
+        {
+            return new Vector(-vector.X, -vector.Y, -vector.Z);
+        }
+
         public static implicit operator Vector3(Vector vector)
         {
             return new Vector3(vector.X, vector.Z, vector.Y);

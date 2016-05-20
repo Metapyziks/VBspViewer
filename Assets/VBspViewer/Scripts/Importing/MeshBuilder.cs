@@ -97,8 +97,6 @@ namespace VBspViewer.Importing
 
         public void AddVertex(Vector pos, Vector normal, Vector2 lightmapUv)
         {
-            const float inchesToMetre = 1f/39.3701f;
-
             var meshVert = new MeshVertex(pos, normal, lightmapUv);
 
             int vertIndex;
@@ -106,7 +104,7 @@ namespace VBspViewer.Importing
             {
                 vertIndex = _verts.Count;
 
-                _verts.Add((Vector3) pos * inchesToMetre);
+                _verts.Add((Vector3) pos * VBspFile.SourceToUnityUnits);
                 _normals.Add(normal);
                 _lightmapUvs.Add(lightmapUv);
                 _vertDict.Add(meshVert, vertIndex);

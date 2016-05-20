@@ -2,7 +2,10 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
+using VBspViewer.Importing.Entities;
 using VBspViewer.Importing.Structures;
 using Plane = VBspViewer.Importing.Structures.Plane;
 using PrimitiveType = VBspViewer.Importing.Structures.PrimitiveType;
@@ -11,6 +14,8 @@ namespace VBspViewer.Importing
 {
     public partial class VBspFile
     {
+        public const float SourceToUnityUnits = 0.01905f;
+
         private readonly Header _header;
         
         public VBspFile(Stream stream)
@@ -85,6 +90,9 @@ namespace VBspViewer.Importing
 
         [Lump(Type = LumpType.LUMP_DISPINFO)]
         private DispInfo[] DispInfos { get; set; }
+
+        [Lump(Type = LumpType.LUMP_ENTITIES)]
+        private byte[] Entities { get; set; }
         
         private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>(); 
 
@@ -154,7 +162,6 @@ namespace VBspViewer.Importing
                 var face = FacesHdr[faceIndex];
                 var plane = Planes[face.PlaneNum];
                 var tex = TexInfos[face.TexInfo];
-                var normal = plane.Normal;
 
                 if ((tex.Flags & ignoreFlags) != 0) continue;
 
@@ -182,7 +189,7 @@ namespace VBspViewer.Importing
                         lightmapUv.y += lightmapRect.y;
                     }
 
-                    meshGen.AddVertex(vert, normal, lightmapUv);
+                    meshGen.AddVertex(vert, plane.Normal, lightmapUv);
                 }
 
                 if (face.NumPrimitives == 0)
@@ -233,6 +240,47 @@ namespace VBspViewer.Importing
             }
 
             return meshes;
+        }
+
+        [ThreadStatic]
+        private static StringBuilder _sDecodeBuilder;
+        private static string DecodeEscapedString(string str)
+        {
+            if (_sDecodeBuilder == null) _sDecodeBuilder = new StringBuilder();
+            else _sDecodeBuilder.Remove(0, _sDecodeBuilder.Length);
+
+            for (var i = 0; i < str.Length; ++i)
+            {
+                if (str[i] != '\\') _sDecodeBuilder.Append(str[i]);
+            }
+
+            return _sDecodeBuilder.ToString();
+        }
+
+        private static IEnumerable<KeyValuePair<string, EntValue>> GetEntityKeyVals(string entMatch, Regex keyValRegex)
+        {
+            foreach (var pairMatch in keyValRegex.Matches(entMatch).Cast<Match>())
+            {
+                var key = DecodeEscapedString(pairMatch.Groups["key"].Value);
+                var value = DecodeEscapedString(pairMatch.Groups["value"].Value);
+                yield return new KeyValuePair<string, EntValue>(key, EntValue.Parse(value));
+            }
+        }
+
+        public IEnumerable<IEnumerable<KeyValuePair<string, EntValue>>> GetEntityKeyVals()
+        {
+            var text = Encoding.ASCII.GetString(Entities);
+            const string stringPattern = @"""(?<{0}>([^\\""]|\\.)*)""";
+            var keyValuePattern = string.Format(stringPattern, "key") + @"\s*" + string.Format(stringPattern, "value");
+            var entityPattern = @"{(?<entity>\s*(" + keyValuePattern + @"\s*)*)}";
+
+            var entityRegex = new Regex(entityPattern);
+            var keyValueRegex = new Regex(keyValuePattern);
+
+            foreach (var entMatch in entityRegex.Matches(text).Cast<Match>())
+            {
+                yield return GetEntityKeyVals(entMatch.Value, keyValueRegex);
+            }
         }
     }
 }
