@@ -11,11 +11,11 @@ namespace VBspViewer.Importing
     {
         private struct MeshVertex : IEquatable<MeshVertex>
         {
-            public readonly Vector Position;
-            public readonly Vector Normal;
+            public readonly Vector3 Position;
+            public readonly Vector3 Normal;
             public readonly Vector2 LightmapUv;
 
-            public MeshVertex(Vector position, Vector normal, Vector2 lightmapUv)
+            public MeshVertex(Vector3 position, Vector3 normal, Vector2 lightmapUv)
             {
                 Position = position;
                 Normal = normal;
@@ -24,7 +24,7 @@ namespace VBspViewer.Importing
 
             public bool Equals(MeshVertex other)
             {
-                return Position.Equals(other.Position) && Normal.Equals(other.Normal) && LightmapUv.Equals(other.LightmapUv);
+                return Position == other.Position && Normal == other.Normal && LightmapUv == other.LightmapUv;
             }
 
             public override bool Equals(object obj)
@@ -95,7 +95,7 @@ namespace VBspViewer.Importing
             _faceIndices.Clear();
         }
 
-        public void AddVertex(Vector pos, Vector normal, Vector2 lightmapUv)
+        public void AddVertex(Vector3 pos, Vector3 normal, Vector2 lightmapUv)
         {
             var meshVert = new MeshVertex(pos, normal, lightmapUv);
 
@@ -104,13 +104,18 @@ namespace VBspViewer.Importing
             {
                 vertIndex = _verts.Count;
 
-                _verts.Add((Vector3) pos * VBspFile.SourceToUnityUnits);
+                _verts.Add(pos);
                 _normals.Add(normal);
                 _lightmapUvs.Add(lightmapUv);
                 _vertDict.Add(meshVert, vertIndex);
             }
 
             _faceIndices.Add(vertIndex);
+        }
+
+        public void AddVertex(Vector3 vert)
+        {
+            AddVertex(vert, Vector3.up, Vector2.zero);
         }
 
         public void CopyToMesh(Mesh mesh)

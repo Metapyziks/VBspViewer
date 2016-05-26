@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml.Serialization;
 using UnityEngine;
 using VBspViewer.Importing.Entities;
 using VBspViewer.Importing.Structures;
@@ -91,6 +92,12 @@ namespace VBspViewer.Importing
         [Lump(Type = LumpType.LUMP_DISPINFO)]
         private DispInfo[] DispInfos { get; set; }
 
+        [Lump(Type = LumpType.LUMP_DISP_VERTS)]
+        private DispVert[] DispVerts { get; set; }
+
+        [Lump(Type = LumpType.LUMP_DISP_LIGHTMAP_SAMPLE_POSITIONS)]
+        private int[] DispLightmapSampleIndices { get; set; }
+
         [Lump(Type = LumpType.LUMP_ENTITIES)]
         private byte[] Entities { get; set; }
         
@@ -117,7 +124,6 @@ namespace VBspViewer.Importing
                 for (var y = 0; y < samplesHeight; ++y)
                 {
                     var index = (face.LightOffset >> 2) + x + y*samplesWidth;
-
                     var sample = LightmapSamplesHdr[index];
 
                     subTex.SetPixel(x, y, sample);
@@ -150,12 +156,45 @@ namespace VBspViewer.Importing
                 Vector3.Dot(pos, vAxis.Normal) + vAxis.Offset);
         }
 
+        private static Vector2 GetLightmapUv(Vector3 pos, Face face, TextureInfo texInfo, Rect lightmapRect)
+        {
+            var lightmapUv = GetUv(pos, texInfo.LightmapUAxis, texInfo.LightmapVAxis);
+
+            lightmapUv.x -= face.LightMapOffsetX - .5f;
+            lightmapUv.y -= face.LightMapOffsetY - .5f;
+            lightmapUv.x /= face.LightMapSizeX + 1f;
+            lightmapUv.y /= face.LightMapSizeY + 1f;
+            
+            lightmapUv.x *= lightmapRect.width;
+            lightmapUv.y *= lightmapRect.height;
+            lightmapUv.x += lightmapRect.x;
+            lightmapUv.y += lightmapRect.y;
+
+            return lightmapUv;
+        }
+
+        private Vector3 GetDisplacementVertex(int offset, int x, int y, int size, Vector3[] corners)
+        {
+            var vert = DispVerts[offset + x + y*(size + 1)];
+
+            var tx = (float) x/size;
+            var ty = (float) y/size;
+            var sx = 1f - tx;
+            var sy = 1f - ty;
+
+            var origin = ty*(sx*corners[1] + tx*corners[2]) + sy*(sx*corners[0] + tx*corners[3]);
+
+            return origin + (Vector3) vert.Vector*vert.Distance;
+        }
+
         private Mesh GenerateMesh(MeshBuilder meshGen, IEnumerable<int> faceIndices)
         {
             var mesh = new Mesh();
             var primitiveIndices = new List<int>();
 
             const SurfFlags ignoreFlags = SurfFlags.NODRAW | SurfFlags.SKIP | SurfFlags.SKY | SurfFlags.SKY2D | SurfFlags.HINT | SurfFlags.TRIGGER;
+
+            var corners = new Vector3[4];
 
             foreach (var faceIndex in faceIndices)
             {
@@ -165,7 +204,50 @@ namespace VBspViewer.Importing
 
                 if ((tex.Flags & ignoreFlags) != 0) continue;
 
-                meshGen.StartFace();
+                Rect lightmapRect;
+                if (!_lightmapRects.TryGetValue(faceIndex, out lightmapRect))
+                {
+                    lightmapRect = new Rect(0f, 0f, 1f, 1f);
+                }
+
+                if (face.DispInfo != -1)
+                {
+                    Debug.Assert(face.NumEdges == 4);
+
+                    var disp = DispInfos[face.DispInfo];
+                    var size = 1 << disp.Power;
+
+                    for (var surfId = face.FirstEdge; surfId < face.FirstEdge + face.NumEdges; ++surfId)
+                    {
+                        var surfEdge = SurfEdges[surfId];
+                        var edgeIndex = Math.Abs(surfEdge);
+                        var edge = Edges[edgeIndex];
+                        var vert = Vertices[surfEdge >= 0 ? edge.A : edge.B];
+
+                        corners[surfId - face.FirstEdge] = (Vector3) vert;
+                    }
+
+                    lightmapRect = new Rect(lightmapRect.x, lightmapRect.yMax, lightmapRect.width, -lightmapRect.height);
+
+                    for (var x = 0; x < size; ++x)
+                    for (var y = 0; y < size; ++y)
+                    {
+                        var a = GetDisplacementVertex(disp.DispVertStart, x, y,         size, corners);
+                        var b = GetDisplacementVertex(disp.DispVertStart, x + 1, y,     size, corners);
+                        var c = GetDisplacementVertex(disp.DispVertStart, x + 1, y + 1, size, corners);
+                        var d = GetDisplacementVertex(disp.DispVertStart, x, y + 1,     size, corners);
+                        
+                        meshGen.StartFace();
+                        meshGen.AddVertex(b * SourceToUnityUnits, Vector3.up, GetLightmapUv(b, face, tex, lightmapRect));
+                        meshGen.AddVertex(a * SourceToUnityUnits, Vector3.up, GetLightmapUv(a, face, tex, lightmapRect));
+                        meshGen.AddVertex(d * SourceToUnityUnits, Vector3.up, GetLightmapUv(d, face, tex, lightmapRect));
+                        meshGen.AddVertex(c * SourceToUnityUnits, Vector3.up, GetLightmapUv(c, face, tex, lightmapRect));
+                        meshGen.AddPrimitive(PrimitiveType.TriangleStrip);
+                        meshGen.EndFace();
+                    }
+
+                    continue;
+                }
 
                 for (var surfId = face.FirstEdge; surfId < face.FirstEdge + face.NumEdges; ++surfId)
                 {
@@ -173,23 +255,9 @@ namespace VBspViewer.Importing
                     var edgeIndex = Math.Abs(surfEdge);
                     var edge = Edges[edgeIndex];
                     var vert = Vertices[surfEdge >= 0 ? edge.A : edge.B];
-                    var lightmapUv = GetUv(vert, tex.LightmapUAxis, tex.LightmapVAxis);
+                    var lightmapUv = GetLightmapUv(vert, face, tex, lightmapRect);
 
-                    Rect lightmapRect;
-                    if (_lightmapRects.TryGetValue(faceIndex, out lightmapRect))
-                    {
-                        lightmapUv.x -= face.LightMapOffsetX - .5f;
-                        lightmapUv.y -= face.LightMapOffsetY - .5f;
-                        lightmapUv.x /= face.LightMapSizeX + 1f;
-                        lightmapUv.y /= face.LightMapSizeY + 1f;
-                        
-                        lightmapUv.x *= lightmapRect.width;
-                        lightmapUv.y *= lightmapRect.height;
-                        lightmapUv.x += lightmapRect.x;
-                        lightmapUv.y += lightmapRect.y;
-                    }
-
-                    meshGen.AddVertex(vert, plane.Normal, lightmapUv);
+                    meshGen.AddVertex((Vector3) vert * SourceToUnityUnits, plane.Normal, lightmapUv);
                 }
 
                 if (face.NumPrimitives == 0)
