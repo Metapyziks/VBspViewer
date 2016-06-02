@@ -56,6 +56,11 @@ namespace VBspViewer.Importing.Entities
         {
             return value.ToVector4();
         }
+
+        public static explicit operator Color(EntValue value)
+        {
+            return value.ToColor();
+        }
         
         public static explicit operator Quaternion(EntValue value)
         {
@@ -136,6 +141,7 @@ namespace VBspViewer.Importing.Entities
         protected virtual Vector2 ToVector2() { return ToVector4(); }
         protected virtual Vector3 ToVector3() { return ToVector4(); }
         protected virtual Vector4 ToVector4() { return new Vector4(float.NaN, float.NaN, float.NaN, float.NaN); }
+        protected virtual Color ToColor() { var vec = ToVector4(); const float clrScale = 1f / 255f; return new Color(vec.x * clrScale, vec.z * clrScale, vec.y * clrScale, vec.w * clrScale); }
         protected virtual Quaternion ToQuaternion() { return new Quaternion(float.NaN, float.NaN, float.NaN, float.NaN); }
     }
 

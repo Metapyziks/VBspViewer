@@ -267,10 +267,10 @@ namespace VBspViewer.Importing
                         var d = GetDisplacementVertex(disp.DispVertStart, x + 1, y,     size, corners, firstCorner);
                         
                         meshGen.StartFace();
-                        meshGen.AddVertex(a * SourceToUnityUnits, Vector3.up, GetLightmapUv(x, y, size, face, lightmapRect));
-                        meshGen.AddVertex(b * SourceToUnityUnits, Vector3.up, GetLightmapUv(x, y + 1, size, face, lightmapRect));
-                        meshGen.AddVertex(c * SourceToUnityUnits, Vector3.up, GetLightmapUv(x + 1, y + 1, size, face, lightmapRect));
-                        meshGen.AddVertex(d * SourceToUnityUnits, Vector3.up, GetLightmapUv(x + 1, y, size, face, lightmapRect));
+                        meshGen.AddVertex(a * SourceToUnityUnits, plane.Normal, GetLightmapUv(x, y, size, face, lightmapRect));
+                        meshGen.AddVertex(b * SourceToUnityUnits, plane.Normal, GetLightmapUv(x, y + 1, size, face, lightmapRect));
+                        meshGen.AddVertex(c * SourceToUnityUnits, plane.Normal, GetLightmapUv(x + 1, y + 1, size, face, lightmapRect));
+                        meshGen.AddVertex(d * SourceToUnityUnits, plane.Normal, GetLightmapUv(x + 1, y, size, face, lightmapRect));
                         meshGen.AddPrimitive(PrimitiveType.TriangleStrip);
                         meshGen.EndFace();
                     }
@@ -367,6 +367,7 @@ namespace VBspViewer.Importing
         public IEnumerable<IEnumerable<KeyValuePair<string, EntValue>>> GetEntityKeyVals()
         {
             var text = Encoding.ASCII.GetString(Entities);
+            File.WriteAllText("entities.txt", text);
             const string stringPattern = @"""(?<{0}>([^\\""]|\\.)*)""";
             var keyValuePattern = string.Format(stringPattern, "key") + @"\s*" + string.Format(stringPattern, "value");
             var entityPattern = @"{(?<entity>\s*(" + keyValuePattern + @"\s*)*)}";

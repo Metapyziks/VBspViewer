@@ -31,7 +31,7 @@ namespace VBspViewer.Behaviours
             Lightmap = _bspFile.GenerateLightmap();
             var meshes = _bspFile.GenerateMeshes();
 
-            Material.mainTexture = Lightmap;
+            Material.SetTexture("_LightMap", Lightmap);
 
             var index = 0;
             foreach (var mesh in meshes)
@@ -91,6 +91,8 @@ namespace VBspViewer.Behaviours
                         light.type = LightType.Directional;
                         light.transform.position = origin;
                         light.transform.rotation = angles;
+
+                        Material.SetColor("_AmbientColor", (Color) keyVals["_ambient"]);
 
                         break;
                     }

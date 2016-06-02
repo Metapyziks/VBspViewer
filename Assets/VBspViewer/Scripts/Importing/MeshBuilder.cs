@@ -122,7 +122,7 @@ namespace VBspViewer.Importing
         {
             mesh.SetVertices(_verts);
             mesh.SetNormals(_normals);
-            mesh.SetUVs(0, _lightmapUvs);
+            mesh.SetUVs(1, _lightmapUvs);
             mesh.SetIndices(_indices.ToArray(), MeshTopology.Triangles, 0);
         }
     }
