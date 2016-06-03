@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Runtime.InteropServices;
 
-namespace VBspViewer.Importing.Structures
+namespace VBspViewer.Importing.VBsp.Structures
 {
     public class Header
     {

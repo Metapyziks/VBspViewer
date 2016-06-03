@@ -5,9 +5,9 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using JetBrains.Annotations;
-using VBspViewer.Importing.Structures;
+using VBspViewer.Importing.VBsp.Structures;
 
-namespace VBspViewer.Importing
+namespace VBspViewer.Importing.VBsp
 {
     internal class ReadLumpWrapper<T>
         where T : struct

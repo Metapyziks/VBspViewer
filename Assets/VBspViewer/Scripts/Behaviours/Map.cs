@@ -2,7 +2,7 @@
 using UnityEngine;
 using System.IO;
 using JetBrains.Annotations;
-using VBspViewer.Importing;
+using VBspViewer.Importing.VBsp;
 using VBspViewer.Importing.Entities;
 
 namespace VBspViewer.Behaviours

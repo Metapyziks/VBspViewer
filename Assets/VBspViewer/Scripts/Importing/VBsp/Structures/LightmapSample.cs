@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using UnityEngine;
 
-namespace VBspViewer.Importing.Structures
+namespace VBspViewer.Importing.VBsp.Structures
 {
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct LightmapSample

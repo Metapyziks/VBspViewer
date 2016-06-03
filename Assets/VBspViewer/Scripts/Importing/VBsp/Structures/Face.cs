@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace VBspViewer.Importing.Structures
+namespace VBspViewer.Importing.VBsp.Structures
 {
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct Face

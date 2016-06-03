@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 
-namespace VBspViewer.Importing.Structures
+namespace VBspViewer.Importing.VBsp.Structures
 {
     [Flags]
     public enum SurfFlags : int

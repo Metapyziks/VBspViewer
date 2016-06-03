@@ -6,11 +6,11 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
 using VBspViewer.Importing.Entities;
-using VBspViewer.Importing.Structures;
-using Plane = VBspViewer.Importing.Structures.Plane;
-using PrimitiveType = VBspViewer.Importing.Structures.PrimitiveType;
+using VBspViewer.Importing.VBsp.Structures;
+using Plane = VBspViewer.Importing.VBsp.Structures.Plane;
+using PrimitiveType = VBspViewer.Importing.VBsp.Structures.PrimitiveType;
 
-namespace VBspViewer.Importing
+namespace VBspViewer.Importing.VBsp
 {
     public partial class VBspFile
     {

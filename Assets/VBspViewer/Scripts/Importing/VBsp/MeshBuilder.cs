@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using VBspViewer.Importing.Structures;
-using PrimitiveType = VBspViewer.Importing.Structures.PrimitiveType;
+using VBspViewer.Importing.VBsp.Structures;
+using PrimitiveType = VBspViewer.Importing.VBsp.Structures.PrimitiveType;
 
-namespace VBspViewer.Importing
+namespace VBspViewer.Importing.VBsp
 {
     public class MeshBuilder
     {
