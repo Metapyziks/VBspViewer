@@ -14,26 +14,54 @@ namespace VBspViewer.Importing.Vpk
             private readonly Stream _baseStream;
             private readonly long _fileOffset;
             private readonly long _fileLength;
+            private readonly int _preloadBytesLength;
+            private readonly byte[] _preloadBytes;
             private long _position;
 
-            public VpkStream(VpkArchve archive, int archiveIndex, long offset, long length)
+            public VpkStream(VpkArchve archive, int archiveIndex, long offset, long length, byte[] preloadBytes)
             {
                 _archive = archive;
                 _archiveIndex = archiveIndex;
                 _baseStream = archive.OpenArchive(archiveIndex);
 
+                _preloadBytesLength = preloadBytes == null ? 0 : _preloadBytes.Length;
+                _preloadBytes = preloadBytes;
+
                 _fileOffset = offset;
-                _fileLength = length;
+                _fileLength = length + _preloadBytesLength;
             }
 
             public override void Flush() { }
 
             public override int Read(byte[] buffer, int offset, int count)
             {
-                var end = Math.Min(_position + count, _fileLength);
+                var preloadRead = 0;
+                var read = 0;
 
-                _baseStream.Position = _fileOffset + _position;
-                return _baseStream.Read(buffer, offset, (int) (end - _position));
+                if (_position < _preloadBytesLength && count > 0)
+                {
+                    var preloadEnd = Math.Min(_position + count, _preloadBytesLength);
+                    preloadRead = (int) (preloadEnd - _position);
+
+                    Array.Copy(_preloadBytes, _position, buffer, offset, preloadRead);
+
+                    offset += preloadRead;
+                    count -= preloadRead;
+
+                    _position = preloadEnd;
+                }
+
+                if (count > 0)
+                {
+                    var end = Math.Min(_position + count, _fileLength);
+
+                    _baseStream.Position = _fileOffset + _position - _preloadBytesLength;
+                    read = _baseStream.Read(buffer, offset, (int) (end - _position));
+
+                    _position += read;
+                }
+
+                return preloadRead + read;
             }
 
             public override long Seek(long offset, SeekOrigin origin)
@@ -262,7 +290,7 @@ namespace VBspViewer.Importing.Vpk
             DirectoryEntry entry;
             if (!_fileDict.TryGetValue(fileName, out entry)) throw new FileNotFoundException();
 
-            return new VpkStream(this, entry.ArchiveIndex, entry.EntryOffset, entry.EntryLength);
+            return new VpkStream(this, entry.ArchiveIndex, entry.EntryOffset, entry.EntryLength, entry.PreloadData);
         }
     }
 }
