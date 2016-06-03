@@ -2,6 +2,7 @@
 using UnityEngine;
 using System.IO;
 using JetBrains.Annotations;
+using VBspViewer.Importing;
 using VBspViewer.Importing.VBsp;
 using VBspViewer.Importing.Entities;
 using VBspViewer.Importing.Vpk;
@@ -18,7 +19,7 @@ namespace VBspViewer.Behaviours
         public Texture2D Lightmap;
 
         private VBspFile _bspFile;
-        private VpkArchve _vpkArchive;
+        private readonly ResourceLoader _resLoader = new ResourceLoader();
 
         [UsedImplicitly]
         private void Start()
@@ -36,7 +37,7 @@ namespace VBspViewer.Behaviours
                 _bspFile = new VBspFile(stream);
             }
 
-            _vpkArchive = new VpkArchve(vpkDirPath);
+            _resLoader.AddResourceProvider(new VpkArchve(vpkDirPath));
 
             Lightmap = _bspFile.GenerateLightmap();
             var meshes = _bspFile.GenerateMeshes();
@@ -118,6 +119,28 @@ namespace VBspViewer.Behaviours
 
                         Material.SetColor("_AmbientColor", (Color) keyVals["_ambient"]);
                         enable = true;
+                        break;
+                    }
+                    case "prop_static":
+                    {
+                        var modelName = (string) keyVals["model"];
+
+                        try
+                        {
+                            var mdl = _resLoader.LoadMdl(modelName);
+
+                            var mf = obj.AddComponent<MeshFilter>();
+                            var mr = obj.AddComponent<MeshRenderer>();
+
+                            mf.sharedMesh = mdl.Mesh;
+
+                            enable = true;
+                        }
+                        catch (FileNotFoundException e)
+                        {
+                            Debug.LogWarningFormat("Unable to load model '{0}'", modelName);
+                        }
+
                         break;
                     }
                 }

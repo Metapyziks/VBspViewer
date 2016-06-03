@@ -5,7 +5,7 @@ using System.Text;
 
 namespace VBspViewer.Importing.Vpk
 {
-    public class VpkArchve
+    public class VpkArchve : IResourceProvider
     {
         private class VpkStream : Stream
         {
@@ -189,7 +189,7 @@ namespace VBspViewer.Importing.Vpk
             }
         }
 
-        private readonly Dictionary<string, DirectoryEntry> _fileDict = new Dictionary<string, DirectoryEntry>();
+        private readonly Dictionary<string, DirectoryEntry> _fileDict = new Dictionary<string, DirectoryEntry>(StringComparer.InvariantCultureIgnoreCase);
 
         private void ReadDirectory(Stream stream)
         {
@@ -283,6 +283,11 @@ namespace VBspViewer.Importing.Vpk
                 _openArchives.Remove(index);
                 info.Stream.Dispose();
             }
+        }
+
+        public bool ContainsFile(string fileName)
+        {
+            return _fileDict.ContainsKey(fileName);
         }
 
         public Stream OpenFile(string fileName)
