@@ -43,15 +43,21 @@ namespace VBspViewer.Behaviours
 
             Material.SetTexture("_LightMap", Lightmap);
 
+            var geomParent = new GameObject("Geometry");
+            geomParent.transform.SetParent(transform, true);
+
             var index = 0;
             foreach (var mesh in meshes)
             {
                 var modelChild = new GameObject("Model " + index++, typeof(MeshFilter), typeof(MeshRenderer));
-                modelChild.transform.SetParent(transform, true);
+                modelChild.transform.SetParent(geomParent.transform, true);
 
                 modelChild.GetComponent<MeshFilter>().sharedMesh = mesh;
                 modelChild.GetComponent<MeshRenderer>().sharedMaterial = Material;
             }
+
+            var entParent = new GameObject("Entities");
+            entParent.transform.SetParent(transform, true);
 
             var keyVals = new Dictionary<string, EntValue>();
 
@@ -61,6 +67,7 @@ namespace VBspViewer.Behaviours
                 string targetName = null;
                 var origin = Vector3.zero;
                 var angles = Quaternion.identity;
+                var pitch = 0f;
 
                 keyVals.Clear();
 
@@ -80,6 +87,9 @@ namespace VBspViewer.Behaviours
                         case "angles":
                             angles = (Quaternion) keyVal.Value;
                             break;
+                        case "pitch":
+                            pitch = (float) keyVal.Value;
+                            break;
                         default:
                             if (keyVals.ContainsKey(keyVal.Key)) continue;
                             keyVals.Add(keyVal.Key, keyVal.Value);
@@ -87,26 +97,32 @@ namespace VBspViewer.Behaviours
                     }
                 }
 
+                var obj = new GameObject(targetName ?? className);
+                obj.transform.SetParent(entParent.transform, true);
+
+                angles *= Quaternion.AngleAxis(-pitch, Vector3.right);
+
+                obj.transform.position = origin;
+                obj.transform.rotation = angles;
+
+                var enable = false;
+
                 switch (className)
                 {
                     case "light_environment":
                     {
-                        var pitch = (float) keyVals["pitch"];
-                        angles *= Quaternion.AngleAxis(-pitch, Vector3.right);
-
-                        var obj = new GameObject(targetName ?? className);
                         var light = obj.AddComponent<Light>();
 
                         light.shadows = LightShadows.Soft;
                         light.type = LightType.Directional;
-                        light.transform.position = origin;
-                        light.transform.rotation = angles;
 
                         Material.SetColor("_AmbientColor", (Color) keyVals["_ambient"]);
-
+                        enable = true;
                         break;
                     }
                 }
+                
+                obj.SetActive(enable);
             }
         }
     }

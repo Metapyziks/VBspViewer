@@ -16,7 +16,7 @@ namespace VBspViewer.Importing.VBsp.Structures
             };
 
             var lumpInfoBytes = reader.ReadBytes(LumpInfoCount*Marshal.SizeOf(typeof (LumpInfo)));
-            var lumps = ReadLumpWrapper<LumpInfo>.ReadLump(lumpInfoBytes, lumpInfoBytes.Length);
+            var lumps = ReadLumpWrapper<LumpInfo>.ReadLump(lumpInfoBytes, 0, lumpInfoBytes.Length);
 
             header.Lumps = lumps;
             header.MapRevision = reader.ReadInt32();

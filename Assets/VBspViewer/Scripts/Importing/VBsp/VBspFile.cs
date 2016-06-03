@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
@@ -28,11 +29,23 @@ namespace VBspViewer.Importing.VBsp
             
             for (var lumpIndex = 0; lumpIndex < Header.LumpInfoCount; ++lumpIndex)
             {
+                var info = _header.Lumps[lumpIndex];
+
+                if ((LumpType) lumpIndex == LumpType.LUMP_GAME_LUMP)
+                {
+                    Debug.LogFormat("{0} Start: 0x{1:x}, Length: 0x{2:x}", LumpType.LUMP_GAME_LUMP, info.Offset, info.Length);
+
+                    stream.Seek(info.Offset, SeekOrigin.Begin);
+                    var lumpCount = reader.ReadInt32();
+                    GameLumps = new GameLumpInfo[lumpCount];
+                    for (var i = 0; i < lumpCount; ++i) GameLumps[i] = new GameLumpInfo(reader);
+                    for (var i = 0; i < lumpCount; ++i) GameLumps[i].ReadContents(stream);
+                    continue;
+                }
+
                 ReadLumpDelegate deleg;
                 if (!delegates.TryGetValue((LumpType) lumpIndex, out deleg)) continue;
 
-                var info = _header.Lumps[lumpIndex];
-                    
                 Debug.LogFormat("{0} Start: 0x{1:x}, Length: 0x{2:x}", (LumpType) lumpIndex, info.Offset, info.Length);
 
                 if (srcBuffer.Length < info.Length)
@@ -99,6 +112,8 @@ namespace VBspViewer.Importing.VBsp
 
         [Lump(Type = LumpType.LUMP_ENTITIES)]
         private byte[] Entities { get; set; }
+
+        private GameLumpInfo[] GameLumps { get; set; }
         
         private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>(); 
 
@@ -377,6 +392,44 @@ namespace VBspViewer.Importing.VBsp
             foreach (var entMatch in entityRegex.Matches(text).Cast<Match>())
             {
                 yield return GetEntityKeyVals(entMatch.Value, keyValueRegex);
+            }
+
+            var propLump = GameLumps.FirstOrDefault(x => x.Id == 0x73707270);
+            if (propLump == null) yield break;
+
+            Debug.Assert(propLump.Version == 10);
+
+            string[] modelNames;
+            int propCount;
+            int readOffset;
+
+            using (var stream = new MemoryStream(propLump.Contents))
+            using (var reader = new BinaryReader(stream))
+            {
+                var modelNameCount = reader.ReadInt32();
+                modelNames = new string[modelNameCount];
+
+                var nameBuffer = new byte[128];
+                for (var i = 0; i < modelNameCount; ++i)
+                {
+                    stream.Read(nameBuffer, 0, 128);
+                    modelNames[i] = Encoding.ASCII.GetString(nameBuffer);
+                }
+
+                var leafCount = reader.ReadInt32();
+                stream.Seek(leafCount*2, SeekOrigin.Current);
+
+                propCount = reader.ReadInt32();
+                readOffset = (int) reader.BaseStream.Position;
+            }
+
+            var props = ReadLumpWrapper<StaticPropV10>.ReadLump(propLump.Contents, readOffset,
+                propCount*Marshal.SizeOf(typeof (StaticPropV10)));
+
+            foreach (var prop in props)
+            {
+                var modelName = modelNames[prop.PropType];
+                Debug.Log(modelName);
             }
         }
     }

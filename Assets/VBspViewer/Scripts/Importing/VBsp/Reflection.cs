@@ -12,7 +12,7 @@ namespace VBspViewer.Importing.VBsp
     internal class ReadLumpWrapper<T>
         where T : struct
     {
-        public static T[] ReadLump(byte[] src, int length)
+        public static T[] ReadLump(byte[] src, int offset, int length)
         {
             var size = Marshal.SizeOf(typeof(T));
             var count = length/size;
@@ -22,7 +22,7 @@ namespace VBspViewer.Importing.VBsp
             
             for (var i = 0; i < count; ++i)
             {
-                Marshal.Copy(src, i * size, tempPtr, size);
+                Marshal.Copy(src, offset + i * size, tempPtr, size);
                 array[i] = (T) Marshal.PtrToStructure(tempPtr, typeof (T));
             }
 
@@ -66,6 +66,7 @@ namespace VBspViewer.Importing.VBsp
 
             var fileParam = Expression.Parameter(typeof (VBspFile), "file");
             var srcParam = Expression.Parameter(typeof (byte[]), "src");
+            var zeroConst = Expression.Constant(0);
             var lengthParam = Expression.Parameter(typeof (int), "length");
 
             const BindingFlags bFlags = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -77,7 +78,7 @@ namespace VBspViewer.Importing.VBsp
                 var type = prop.PropertyType.GetElementType();
                 var readLumpMethod = FindReadLumpMethod(type);
 
-                var call = Expression.Call(readLumpMethod, srcParam, lengthParam);
+                var call = Expression.Call(readLumpMethod, srcParam, zeroConst, lengthParam);
                 var set = Expression.Call(fileParam, prop.GetSetMethod(true), call);
                 var lambda = Expression.Lambda<ReadLumpDelegate>(set, fileParam, srcParam, lengthParam);
 
