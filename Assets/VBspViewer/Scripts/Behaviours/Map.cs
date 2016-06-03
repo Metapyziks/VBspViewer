@@ -4,29 +4,39 @@ using System.IO;
 using JetBrains.Annotations;
 using VBspViewer.Importing.VBsp;
 using VBspViewer.Importing.Entities;
+using VBspViewer.Importing.Vpk;
 
 namespace VBspViewer.Behaviours
 {
     public class Map : MonoBehaviour
     {
+        private const string GamePath = @"C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\csgo";
+
         public string FilePath;
         public Material Material;
         
         public Texture2D Lightmap;
 
         private VBspFile _bspFile;
+        private VpkArchve _vpkArchive;
 
         [UsedImplicitly]
         private void Start()
         {
-            var filePath = Path.Combine(@"C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\csgo\maps", FilePath);
+            var filePath = Path.Combine(GamePath, Path.Combine("maps", FilePath));
+            var vpkDirPath = Path.Combine(GamePath, "pak01_dir.vpk");
 
-            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return;
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                throw new FileNotFoundException("Could not find map file.", filePath);
+            }
 
             using (var stream = File.OpenRead(filePath))
             {
                 _bspFile = new VBspFile(stream);
             }
+
+            _vpkArchive = new VpkArchve(vpkDirPath);
 
             Lightmap = _bspFile.GenerateLightmap();
             var meshes = _bspFile.GenerateMeshes();
