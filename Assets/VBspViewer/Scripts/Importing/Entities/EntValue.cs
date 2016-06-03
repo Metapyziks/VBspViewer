@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using JetBrains.Annotations;
 using UnityEngine;
+using VBspViewer.Importing.VBsp.Structures;
 
 namespace VBspViewer.Importing.Entities
 {
@@ -26,6 +27,22 @@ namespace VBspViewer.Importing.Entities
     public abstract class EntValue
     {
         protected static readonly CultureInfo CultureInfo = CultureInfo.GetCultureInfo("en-US");
+
+        public static implicit operator EntValue(string value)
+        {
+            return new StringValue { Value = value };
+        }
+
+        public static implicit operator EntValue(double value)
+        {
+            return new NumberValue { Value = value };
+        }
+
+        public static implicit operator EntValue(Vector value)
+        {
+            return new Vector3Value { Value = value };
+        }
+
 
         public static explicit operator string(EntValue value)
         {
@@ -150,7 +167,7 @@ namespace VBspViewer.Importing.Entities
     {
         public const string Pattern = ".*";
 
-        public string Value { get; private set; }
+        public string Value { get; set; }
 
         protected override void OnParse(Match match)
         {
@@ -168,7 +185,7 @@ namespace VBspViewer.Importing.Entities
     {
         public const string Pattern = "-?[0-9]+(\\.[0-9]+)?([eE]-?[0-9]+)?";
 
-        public double Value { get; private set; }
+        public double Value { get; set; }
 
         protected override void OnParse(Match match)
         {
@@ -203,7 +220,7 @@ namespace VBspViewer.Importing.Entities
             + ")\\s+(?<y>" + NumberValue.Pattern
             + ")(\\s*\\])?";
 
-        public Vector2 Value { get; private set; }
+        public Vector2 Value { get; set; }
 
         protected override void OnParse(Match match)
         {
@@ -236,7 +253,7 @@ namespace VBspViewer.Importing.Entities
             + ")\\s+(?<y>" + NumberValue.Pattern
             + ")(\\s*\\])?";
 
-        public Vector3 Value { get; private set; }
+        public Vector3 Value { get; set; }
 
         protected override void OnParse(Match match)
         {
@@ -271,7 +288,7 @@ namespace VBspViewer.Importing.Entities
             + ")\\s+(?<w>" + NumberValue.Pattern
             + ")(\\s*\\])?";
 
-        public Vector4 Value { get; private set; }
+        public Vector4 Value { get; set; }
 
         protected override void OnParse(Match match)
         {

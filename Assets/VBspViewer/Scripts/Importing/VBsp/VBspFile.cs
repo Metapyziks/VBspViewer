@@ -378,6 +378,16 @@ namespace VBspViewer.Importing.VBsp
             }
         }
 
+        private static IEnumerable<KeyValuePair<string, EntValue>> GetStaticPropKeyVals(StaticPropV10 prop,
+            string modelName)
+        {
+            yield return new KeyValuePair<string, EntValue>("classname", "prop_static");
+            yield return new KeyValuePair<string, EntValue>("origin", prop.Origin);
+            yield return new KeyValuePair<string, EntValue>("angles", prop.Angles);
+            yield return new KeyValuePair<string, EntValue>("model", modelName);
+            yield return new KeyValuePair<string, EntValue>("skin", prop.Skin);
+        } 
+
         public IEnumerable<IEnumerable<KeyValuePair<string, EntValue>>> GetEntityKeyVals()
         {
             var text = Encoding.ASCII.GetString(Entities);
@@ -429,7 +439,7 @@ namespace VBspViewer.Importing.VBsp
             foreach (var prop in props)
             {
                 var modelName = modelNames[prop.PropType];
-                Debug.Log(modelName);
+                yield return GetStaticPropKeyVals(prop, modelName);
             }
         }
     }
