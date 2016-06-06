@@ -11,8 +11,6 @@ namespace VBspViewer.Behaviours
 {
     public class Map : MonoBehaviour
     {
-        private const string GamePath = @"D:\Games\SteamLibrary\steamapps\common\Counter-Strike Global Offensive\csgo";
-
         public string FilePath;
         public Material Material;
         
@@ -26,8 +24,8 @@ namespace VBspViewer.Behaviours
         [UsedImplicitly]
         private void Start()
         {
-            var filePath = Path.Combine(GamePath, Path.Combine("maps", FilePath));
-            var vpkDirPath = Path.Combine(GamePath, "pak01_dir.vpk");
+            var filePath = Path.Combine(Config.CsgoPath, Path.Combine("maps", FilePath));
+            var vpkDirPath = Path.Combine(Config.CsgoPath, "pak01_dir.vpk");
 
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
