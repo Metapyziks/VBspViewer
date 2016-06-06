@@ -33,6 +33,11 @@ namespace VBspViewer.Importing.Entities
             return new StringValue { Value = value };
         }
 
+        public static implicit operator EntValue(bool value)
+        {
+            return new BoolValue { Value = value };
+        }
+
         public static implicit operator EntValue(double value)
         {
             return new NumberValue { Value = value };
@@ -43,10 +48,14 @@ namespace VBspViewer.Importing.Entities
             return new Vector3Value { Value = value };
         }
 
-
         public static explicit operator string(EntValue value)
         {
             return value.ToString();
+        }
+
+        public static explicit operator bool(EntValue value)
+        {
+            return value.ToBoolean();
         }
 
         public static explicit operator int(EntValue value)
@@ -155,6 +164,7 @@ namespace VBspViewer.Importing.Entities
         protected abstract void OnParse(Match match);
 
         protected virtual double ToDouble() { return ToVector4().x; }
+        protected virtual bool ToBoolean() { return ToVector4().x != 0f; }
         protected virtual Vector2 ToVector2() { return ToVector4(); }
         protected virtual Vector3 ToVector3() { return ToVector4(); }
         protected virtual Vector4 ToVector4() { return new Vector4(float.NaN, float.NaN, float.NaN, float.NaN); }
@@ -177,6 +187,34 @@ namespace VBspViewer.Importing.Entities
         public override string ToString()
         {
             return Value;
+        }
+    }
+
+    [EntValue(Pattern, int.MaxValue)]
+    public class BoolValue : EntValue
+    {
+        public const string Pattern = "[Tt]rue|[Ff]alse";
+
+        public bool Value { get; set; }
+
+        protected override void OnParse(Match match)
+        {
+            Value = bool.Parse(match.Value);
+        }
+
+        public override string ToString()
+        {
+            return Value.ToString();
+        }
+
+        protected override bool ToBoolean()
+        {
+            return Value;
+        }
+
+        protected override double ToDouble()
+        {
+            return Value ? 1d : 0d;
         }
     }
 

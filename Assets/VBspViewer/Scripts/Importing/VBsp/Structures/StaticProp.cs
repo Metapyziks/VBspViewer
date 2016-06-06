@@ -27,8 +27,8 @@ namespace VBspViewer.Importing.VBsp.Structures
         public uint ColorModulation;
         [MarshalAs(UnmanagedType.U1)] public bool DisableX360;
 
-        private byte Unknown0;
-        private ushort Unknown1;
-        private uint Unknown2;
+        public byte Unknown0;
+        public ushort Unknown1;
+        public uint Unknown2;
     }
 }

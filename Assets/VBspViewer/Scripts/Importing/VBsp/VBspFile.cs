@@ -113,6 +113,21 @@ namespace VBspViewer.Importing.VBsp
         [Lump(Type = LumpType.LUMP_ENTITIES)]
         private byte[] Entities { get; set; }
 
+        [Lump(Type = LumpType.LUMP_PROPCOLLISION)]
+        private short[] PropConvexHulls { get; set; }
+
+        [Lump(Type = LumpType.LUMP_PROPHULLS)]
+        private short[] PropHulls { get; set; }
+
+        [Lump(Type = LumpType.LUMP_PROPHULLVERTS)]
+        private Vector[] PropHullVertices { get; set; }
+
+        [Lump(Type = LumpType.LUMP_PROPTRIS)]
+        private short[] PropHullFaces { get; set; }
+
+        [Lump(Type = LumpType.LUMP_PHYSCOLLIDE)]
+        private byte[] PhysCollisionData { get; set; }
+
         private GameLumpInfo[] GameLumps { get; set; }
         
         private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>(); 
@@ -386,6 +401,8 @@ namespace VBspViewer.Importing.VBsp
             yield return new KeyValuePair<string, EntValue>("angles", prop.Angles);
             yield return new KeyValuePair<string, EntValue>("model", modelName);
             yield return new KeyValuePair<string, EntValue>("skin", prop.Skin);
+            yield return new KeyValuePair<string, EntValue>("solid", prop.Solid);
+            yield return new KeyValuePair<string, EntValue>("flags", prop.Flags);
         } 
 
         public IEnumerable<IEnumerable<KeyValuePair<string, EntValue>>> GetEntityKeyVals()
@@ -423,7 +440,7 @@ namespace VBspViewer.Importing.VBsp
                 for (var i = 0; i < modelNameCount; ++i)
                 {
                     stream.Read(nameBuffer, 0, 128);
-                    modelNames[i] = Encoding.ASCII.GetString(nameBuffer);
+                    modelNames[i] = Encoding.ASCII.GetString(nameBuffer).TrimEnd('\0');
                 }
 
                 var leafCount = reader.ReadInt32();
@@ -436,11 +453,22 @@ namespace VBspViewer.Importing.VBsp
             var props = ReadLumpWrapper<StaticPropV10>.ReadLump(propLump.Contents, readOffset,
                 propCount*Marshal.SizeOf(typeof (StaticPropV10)));
 
+
+            var probsWithCollision = props.Count(x => x.Solid);
+            Debug.Log("Props with collision info: " + probsWithCollision.ToString());
+
+            var textfile = File.CreateText("probstuff.txt");
+
             foreach (var prop in props)
             {
                 var modelName = modelNames[prop.PropType];
+
+                textfile.WriteLine("{0}: {1}, {2}, {3}", modelName, prop.Unknown0, prop.Unknown1, prop.Unknown2);
+
                 yield return GetStaticPropKeyVals(prop, modelName);
+
             }
+            textfile.Close();
         }
     }
 }

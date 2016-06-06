@@ -11,7 +11,7 @@ namespace VBspViewer.Behaviours
 {
     public class Map : MonoBehaviour
     {
-        private const string GamePath = @"C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\csgo";
+        private const string GamePath = @"D:\Games\SteamLibrary\steamapps\common\Counter-Strike Global Offensive\csgo";
 
         public string FilePath;
         public Material Material;
@@ -20,6 +20,8 @@ namespace VBspViewer.Behaviours
 
         private VBspFile _bspFile;
         private readonly ResourceLoader _resLoader = new ResourceLoader();
+
+        private MeshFilter _primitiveProvider;
 
         [UsedImplicitly]
         private void Start()
@@ -62,6 +64,8 @@ namespace VBspViewer.Behaviours
 
             var keyVals = new Dictionary<string, EntValue>();
 
+            _primitiveProvider = GameObject.CreatePrimitive(PrimitiveType.Cube).GetComponent<MeshFilter>();
+
             foreach (var entInfo in _bspFile.GetEntityKeyVals())
             {
                 string className = null;
@@ -91,6 +95,7 @@ namespace VBspViewer.Behaviours
                         case "pitch":
                             pitch = (float) keyVal.Value;
                             break;
+                       
                         default:
                             if (keyVals.ContainsKey(keyVal.Key)) continue;
                             keyVals.Add(keyVal.Key, keyVal.Value);
@@ -132,7 +137,16 @@ namespace VBspViewer.Behaviours
                             var mf = obj.AddComponent<MeshFilter>();
                             var mr = obj.AddComponent<MeshRenderer>();
 
-                            mf.sharedMesh = mdl.Mesh;
+                            mf.sharedMesh = mdl.GetMesh(0);
+
+                            //var hasCollision = (bool)keyVals["solid"];
+                            //if(hasCollision)
+                            //{
+                                // let's ignore collision for now
+                                mf.sharedMesh = _primitiveProvider.sharedMesh;
+                            //}                              
+                            
+                            obj.name = modelName;
 
                             enable = true;
                         }

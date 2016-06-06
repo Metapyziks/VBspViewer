@@ -84,7 +84,7 @@ namespace VBspViewer.Importing.Mdl
             _baseFilename = filename.Substring(0, filename.Length - ".mdl".Length);
         }
 
-        private Mesh GetMesh(int lod)
+        public Mesh GetMesh(int lod)
         {
             Mesh mesh;
             if (_lods.TryGetValue(lod, out mesh)) return mesh;
