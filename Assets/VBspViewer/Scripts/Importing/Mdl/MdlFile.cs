@@ -4,6 +4,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
+using VBspViewer.Importing.VBsp;
 using VBspViewer.Importing.VBsp.Structures;
 
 namespace VBspViewer.Importing.Mdl
@@ -54,6 +55,11 @@ namespace VBspViewer.Importing.Mdl
             public Vector Normal;
             public float TexCoordX;
             public float TexCoordY;
+
+            public override string ToString()
+            {
+                return string.Format("{0}, {1}, ({2}, {3})", Position, Normal, TexCoordX, TexCoordY);
+            }
         }
 
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -66,6 +72,13 @@ namespace VBspViewer.Importing.Mdl
             public byte Bone1;
             public byte Bone2;
             public byte NumBones;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct MaterialReplacementListHeader
+        {
+            public int NumReplacements;
+            public int ReplacementOffset;
         }
 
         private readonly IResourceProvider _loader;
@@ -84,6 +97,72 @@ namespace VBspViewer.Importing.Mdl
             _baseFilename = filename.Substring(0, filename.Length - ".mdl".Length);
         }
 
+        private StudioVertex[] _vertices;
+        private StudioVertex[] GetVertices()
+        {
+            if (_vertices != null) return _vertices;
+
+            var filePath = _baseFilename + ".vvd";
+
+            using (var stream = _loader.OpenFile(filePath))
+            using (var reader = new BinaryReader(stream))
+            {
+                var id = reader.ReadInt32();
+                var version = reader.ReadInt32();
+
+                Debug.Assert(id == 0x56534449);
+                Debug.Assert(version == 4);
+
+                reader.ReadInt32();
+
+                var numLods = reader.ReadInt32();
+                var numLodVerts = new int[8];
+
+                for (var i = 0; i < numLodVerts.Length; ++i)
+                {
+                    numLodVerts[i] = reader.ReadInt32();
+                }
+
+                var numFixups = reader.ReadInt32();
+                var fixupTableStart = reader.ReadInt32();
+                var vertexDataStart = reader.ReadInt32();
+                var tangentDataStart = reader.ReadInt32();
+
+                reader.BaseStream.Seek(vertexDataStart, SeekOrigin.Begin);
+
+                _vertices = ReadLumpWrapper<StudioVertex>.ReadLump(reader.BaseStream, numLodVerts[0]);
+            }
+
+            return _vertices;
+        }
+
+        private void GetTriangles()
+        {
+            var filePath = _baseFilename + ".dx90.vtx";
+
+            using (var stream = _loader.OpenFile(filePath))
+            using (var reader = new BinaryReader(stream))
+            {
+                var version = reader.ReadInt32();
+
+                Debug.Assert(version == 7);
+
+                var vertCacheSize = reader.ReadInt32();
+                reader.ReadUInt16(); // maxBonesPerStrip
+                reader.ReadUInt16(); // maxBonesPerTri
+                reader.ReadInt32(); // maxBonesPerVert
+
+                reader.ReadInt32(); // checksum
+
+                var numLods = reader.ReadInt32();
+                var materialReplacementHeaders =
+                    ReadLumpWrapper<MaterialReplacementListHeader>.ReadLump(reader.BaseStream, numLods);
+
+                var numBodyParts = reader.ReadInt32();
+                var bodyPartOffset = reader.ReadInt32();
+            }
+        }
+
         public Mesh GetMesh(int lod)
         {
             Mesh mesh;
@@ -91,7 +170,7 @@ namespace VBspViewer.Importing.Mdl
 
             mesh = new Mesh();
 
-
+            var verts = GetVertices();
 
             _lods.Add(lod, mesh);
             return mesh;

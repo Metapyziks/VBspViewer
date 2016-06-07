@@ -51,7 +51,7 @@ namespace VBspViewer.Importing.VBsp.Structures
 
         public override string ToString()
         {
-            return string.Format("{0:F2}, {1:F2}, {2:F2}", X, Y, Z);
+            return string.Format("({0:F2}, {1:F2}, {2:F2})", X, Y, Z);
         }
     }
 }

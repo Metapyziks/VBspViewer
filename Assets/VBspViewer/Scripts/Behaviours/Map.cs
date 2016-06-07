@@ -128,8 +128,8 @@ namespace VBspViewer.Behaviours
                     {
                         var modelName = (string) keyVals["model"];
 
-                        try
-                        {
+                        //try
+                        //{
                             var mdl = _resLoader.LoadMdl(modelName);
 
                             var mf = obj.AddComponent<MeshFilter>();
@@ -147,11 +147,11 @@ namespace VBspViewer.Behaviours
                             obj.name = modelName;
 
                             enable = true;
-                        }
-                        catch (FileNotFoundException e)
-                        {
-                            Debug.LogWarningFormat("Unable to load model '{0}'", modelName);
-                        }
+                        //}
+                        //catch (FileNotFoundException e)
+                        //{
+                        //    Debug.LogWarningFormat("Unable to load model '{0}'", modelName);
+                        //}
 
                         break;
                     }

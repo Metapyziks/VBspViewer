@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -29,6 +30,14 @@ namespace VBspViewer.Importing.VBsp
             Marshal.FreeHGlobal(tempPtr);
 
             return array;
+        }
+
+        public static T[] ReadLump(Stream stream, int count)
+        {
+            var length = Marshal.SizeOf(typeof (T))*count;
+            var bytes = new byte[length];
+            stream.Read(bytes, 0, length);
+            return ReadLump(bytes, 0, length);
         }
     }
 

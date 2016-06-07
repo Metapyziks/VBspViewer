@@ -18,6 +18,8 @@ namespace VBspViewer.Importing.Vpk
             private readonly byte[] _preloadBytes;
             private long _position;
 
+            private bool _disposed;
+
             public VpkStream(VpkArchve archive, int archiveIndex, long offset, long length, byte[] preloadBytes)
             {
                 _archive = archive;
@@ -121,8 +123,11 @@ namespace VBspViewer.Importing.Vpk
 
             protected override void Dispose(bool disposing)
             {
+                if (_disposed) return;
+
                 if (disposing)
                 {
+                    _disposed = true;
                     _archive.CloseArchive(_archiveIndex);
                 }
             }
@@ -137,7 +142,7 @@ namespace VBspViewer.Importing.Vpk
 
             if (!dirFilePath.EndsWith(dirPostfix)) throw new ArgumentException();
 
-            _archiveFileNameFormat = dirFilePath.Substring(0, dirFilePath.Length - dirPostfix.Length) + "{0:000}.vpk";
+            _archiveFileNameFormat = dirFilePath.Substring(0, dirFilePath.Length - dirPostfix.Length) + "_{0:000}.vpk";
 
             using (var stream = File.Open(dirFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
