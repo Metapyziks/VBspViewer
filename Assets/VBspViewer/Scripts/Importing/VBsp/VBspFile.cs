@@ -93,7 +93,7 @@ namespace VBspViewer.Importing.VBsp
         private LightmapSample[] LightmapSamples { get; set; }
 
         [Lump(Type = LumpType.LUMP_LIGHTING_HDR)]
-        private LightmapSample[] LightmapSamplesHdr { get; set; }
+        private byte[] LightmapSamplesHdr { get; set; }
         
         [Lump(Type = LumpType.LUMP_FACES_HDR)]
         private Face[] FacesHdr { get; set; }
@@ -152,10 +152,14 @@ namespace VBspViewer.Importing.VBsp
                 for (var x = 0; x < samplesWidth; ++x)
                 for (var y = 0; y < samplesHeight; ++y)
                 {
-                    var index = (face.LightOffset >> 2) + x + y*samplesWidth;
-                    var sample = LightmapSamplesHdr[index];
+                    var index = face.LightOffset + ((x + y*samplesWidth) << 2);
+                        
+                    var r = LightmapSamplesHdr[index + 0];
+                    var g = LightmapSamplesHdr[index + 1];
+                    var b = LightmapSamplesHdr[index + 2];
+                    var e = (sbyte) LightmapSamplesHdr[index + 3];
 
-                    subTex.SetPixel(x, y, sample);
+                    subTex.SetPixel(x, y, new LightmapSample { R = r, G = g, B = b, Exponent = e});
                 }
 
                 textures[texIndex++] = subTex;
