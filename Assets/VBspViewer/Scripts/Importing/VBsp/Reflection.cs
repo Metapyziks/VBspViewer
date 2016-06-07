@@ -38,6 +38,7 @@ namespace VBspViewer.Importing.VBsp
         private class LumpAttribute : Attribute
         {
             public LumpType Type { get; set; }
+            public int StartOffset { get; set; }
         }
 
         private delegate void ReadLumpDelegate(VBspFile file, byte[] src, int length);
@@ -66,7 +67,6 @@ namespace VBspViewer.Importing.VBsp
 
             var fileParam = Expression.Parameter(typeof (VBspFile), "file");
             var srcParam = Expression.Parameter(typeof (byte[]), "src");
-            var zeroConst = Expression.Constant(0);
             var lengthParam = Expression.Parameter(typeof (int), "length");
 
             const BindingFlags bFlags = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -78,7 +78,9 @@ namespace VBspViewer.Importing.VBsp
                 var type = prop.PropertyType.GetElementType();
                 var readLumpMethod = FindReadLumpMethod(type);
 
-                var call = Expression.Call(readLumpMethod, srcParam, zeroConst, lengthParam);
+                var offsetConst = Expression.Constant(attrib.StartOffset);
+                var lengthVal = Expression.Subtract(lengthParam, offsetConst);
+                var call = Expression.Call(readLumpMethod, srcParam, offsetConst, lengthVal);
                 var set = Expression.Call(fileParam, prop.GetSetMethod(true), call);
                 var lambda = Expression.Lambda<ReadLumpDelegate>(set, fileParam, srcParam, lengthParam);
 
