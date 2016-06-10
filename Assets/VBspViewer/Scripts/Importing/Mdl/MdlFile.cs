@@ -259,7 +259,7 @@ namespace VBspViewer.Importing.Mdl
                         ReadLumpWrapper<ModelLodHeader>.ReadLumpFromStream(reader.BaseStream, model.NumLods, lod =>
                         {
                             if (lodIndex++ != lodLevel) return;
-
+                            
                             reader.BaseStream.Seek(lod.MeshOffset, SeekOrigin.Current);
                             ReadLumpWrapper<MeshHeader>.ReadLumpFromStream(reader.BaseStream, lod.NumMeshes, mesh =>
                             {
@@ -283,7 +283,7 @@ namespace VBspViewer.Importing.Mdl
                                         for (var i = 0; i < strip.NumIndices; ++i)
                                         {
                                             var index = indices[strip.IndexOffset + i];
-                                            var vert = verts[index];
+                                            var vert = verts[strip.VertOffset + index];
 
                                             stripIndices.Add(vert.OrigMeshVertId);
                                         }
@@ -294,20 +294,13 @@ namespace VBspViewer.Importing.Mdl
                                                 outIndices.AddRange(stripIndices);
                                                 break;
                                             case StripHeaderFlags.IsTriStrip:
-                                                for (var i = 2; i < stripIndices.Count; ++i)
+                                                for (var i = 0; i < stripIndices.Count - 2; ++i)
                                                 {
-                                                    switch (i & 1)
-                                                    {
-                                                        case 0:
-                                                            outIndices.Add(stripIndices[i - 2]);
-                                                            outIndices.Add(stripIndices[i - 1]);
-                                                            break;
-                                                        case 1:
-                                                            outIndices.Add(stripIndices[i - 1]);
-                                                            outIndices.Add(stripIndices[i - 2]);
-                                                            break;
-                                                    }
+                                                    var add = i & 1;
+
                                                     outIndices.Add(stripIndices[i]);
+                                                    outIndices.Add(stripIndices[i + 2 - add]);
+                                                    outIndices.Add(stripIndices[i + 1 + add]);
                                                 }
                                                 break;
                                         }
