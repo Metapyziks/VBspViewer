@@ -12,8 +12,9 @@ namespace VBspViewer.Behaviours
     public class Map : MonoBehaviour
     {
         public string FilePath;
-        public Material Material;
-        
+        public Material WorldMaterial;
+        public Material PropMaterial;
+
         public Texture2D Lightmap;
 
         private VBspFile _bspFile;
@@ -42,7 +43,7 @@ namespace VBspViewer.Behaviours
             Lightmap = _bspFile.GenerateLightmap();
             var meshes = _bspFile.GenerateMeshes();
 
-            Material.SetTexture("_LightMap", Lightmap);
+            WorldMaterial.SetTexture("_LightMap", Lightmap);
 
             var geomParent = new GameObject("Geometry");
             geomParent.transform.SetParent(transform, true);
@@ -54,7 +55,7 @@ namespace VBspViewer.Behaviours
                 modelChild.transform.SetParent(geomParent.transform, true);
 
                 modelChild.GetComponent<MeshFilter>().sharedMesh = mesh;
-                modelChild.GetComponent<MeshRenderer>().sharedMaterial = Material;
+                modelChild.GetComponent<MeshRenderer>().sharedMaterial = WorldMaterial;
             }
 
             var entParent = new GameObject("Entities");
@@ -120,7 +121,7 @@ namespace VBspViewer.Behaviours
                         light.shadows = LightShadows.Soft;
                         light.type = LightType.Directional;
 
-                        Material.SetColor("_AmbientColor", (Color) keyVals["_ambient"]);
+                        WorldMaterial.SetColor("_AmbientColor", (Color) keyVals["_ambient"]);
                         enable = true;
                         break;
                     }
@@ -128,30 +129,22 @@ namespace VBspViewer.Behaviours
                     {
                         var modelName = (string) keyVals["model"];
 
-                        //try
-                        //{
+                        try
+                        {
                             var mdl = _resLoader.LoadMdl(modelName);
 
                             var mf = obj.AddComponent<MeshFilter>();
                             var mr = obj.AddComponent<MeshRenderer>();
 
                             mf.sharedMesh = mdl.GetMesh(0);
-
-                            //var hasCollision = (bool)keyVals["solid"];
-                            //if(hasCollision)
-                            //{
-                                // let's ignore collision for now
-                                mf.sharedMesh = _primitiveProvider.sharedMesh;
-                            //}                              
-                            
-                            obj.name = modelName;
+                            mr.sharedMaterial = PropMaterial;
 
                             enable = true;
-                        //}
-                        //catch (FileNotFoundException e)
-                        //{
-                        //    Debug.LogWarningFormat("Unable to load model '{0}'", modelName);
-                        //}
+                        }
+                        catch (FileNotFoundException e)
+                        {
+                            Debug.LogWarningFormat("Unable to load model '{0}'", modelName);
+                        }
 
                         break;
                     }

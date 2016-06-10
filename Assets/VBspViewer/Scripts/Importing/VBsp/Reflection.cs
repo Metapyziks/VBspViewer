@@ -32,12 +32,33 @@ namespace VBspViewer.Importing.VBsp
             return array;
         }
 
-        public static T[] ReadLump(Stream stream, int count)
+        public static void ReadLumpFromStream(Stream stream, int count, Action<T> handler)
         {
-            var length = Marshal.SizeOf(typeof (T))*count;
-            var bytes = new byte[length];
-            stream.Read(bytes, 0, length);
-            return ReadLump(bytes, 0, length);
+            var size = Marshal.SizeOf(typeof(T));
+            var tempPtr = Marshal.AllocHGlobal(size);
+            var buffer = new byte[size];
+
+            for (var i = 0; i < count; ++i)
+            {
+                var start = stream.Position;
+                stream.Read(buffer, 0, size);
+                Marshal.Copy(buffer, 0, tempPtr, size);
+                var val = (T) Marshal.PtrToStructure(tempPtr, typeof(T));
+
+                stream.Seek(start, SeekOrigin.Begin);
+                handler(val);
+                stream.Seek(start + size, SeekOrigin.Begin);
+            }
+
+            Marshal.FreeHGlobal(tempPtr);
+        }
+
+        public static T[] ReadLumpFromStream(Stream stream, int count)
+        {
+            var arr = new T[count];
+            var index = 0;
+            ReadLumpFromStream(stream, count, val => arr[index++] = val);
+            return arr;
         }
     }
 

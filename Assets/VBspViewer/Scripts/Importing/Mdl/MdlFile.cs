@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -81,6 +82,86 @@ namespace VBspViewer.Importing.Mdl
             public int ReplacementOffset;
         }
 
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct BodyPartHeader
+        {
+            public int NumModels;
+            public int ModelOffset;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct ModelHeader
+        {
+            public int NumLods;
+            public int LodOffset;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct ModelLodHeader
+        {
+            public int NumMeshes;
+            public int MeshOffset;
+            public float SwitchPoint;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct MeshHeader
+        {
+            public int NumStripGroups;
+            public int StripGroupHeaderOffset;
+            public byte MeshFlags;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct StripGroupHeader
+        {
+            public int NumVerts;
+            public int VertOffset;
+
+            public int NumIndices;
+            public int IndexOffset;
+
+            public int NumStrips;
+            public int StripOffset;
+        }
+
+        private enum StripHeaderFlags : byte
+        {
+            IsTriList = 1,
+            IsTriStrip = 2
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct StripHeader
+        {
+            public int NumIndices;
+            public int IndexOffset;
+
+            public int NumVerts;
+            public int VertOffset;
+
+            public short NumBones;
+            public StripHeaderFlags Flags;
+
+            public int NumBoneStateChanges;
+            public int BoneStateChangeOffset;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct OptimizedVertex
+        {
+            public byte BoneWeightIndex0;
+            public byte BoneWeightIndex1;
+            public byte BoneWeightIndex2;
+            public byte NumBones;
+
+            public ushort OrigMeshVertId;
+
+            public sbyte BoneId0;
+            public sbyte BoneId1;
+            public sbyte BoneId2;
+        }
+
         private readonly IResourceProvider _loader;
         private readonly string _baseFilename;
 
@@ -130,15 +211,17 @@ namespace VBspViewer.Importing.Mdl
 
                 reader.BaseStream.Seek(vertexDataStart, SeekOrigin.Begin);
 
-                _vertices = ReadLumpWrapper<StudioVertex>.ReadLump(reader.BaseStream, numLodVerts[0]);
+                _vertices = ReadLumpWrapper<StudioVertex>.ReadLumpFromStream(reader.BaseStream, (tangentDataStart - vertexDataStart)/Marshal.SizeOf(typeof(StudioVertex)));
             }
 
             return _vertices;
         }
 
-        private void GetTriangles()
+        private int[] GetTriangles(int lodLevel = 0)
         {
             var filePath = _baseFilename + ".dx90.vtx";
+
+            var outIndices = new List<int>();
 
             using (var stream = _loader.OpenFile(filePath))
             using (var reader = new BinaryReader(stream))
@@ -148,31 +231,131 @@ namespace VBspViewer.Importing.Mdl
                 Debug.Assert(version == 7);
 
                 var vertCacheSize = reader.ReadInt32();
-                reader.ReadUInt16(); // maxBonesPerStrip
-                reader.ReadUInt16(); // maxBonesPerTri
-                reader.ReadInt32(); // maxBonesPerVert
+                var maxBonesPerStrip = reader.ReadUInt16();
+                var maxBonesPerTri = reader.ReadUInt16();
+                var maxBonesPerVert = reader.ReadInt32();
 
-                reader.ReadInt32(); // checksum
+                var checksum = reader.ReadInt32();
 
                 var numLods = reader.ReadInt32();
-                var materialReplacementHeaders =
-                    ReadLumpWrapper<MaterialReplacementListHeader>.ReadLump(reader.BaseStream, numLods);
+                var matReplacementListOffset = reader.ReadInt32();
 
                 var numBodyParts = reader.ReadInt32();
                 var bodyPartOffset = reader.ReadInt32();
+
+                var lods = new List<ModelLodHeader>();
+
+                var stripIndices = new List<int>();
+
+                reader.BaseStream.Seek(bodyPartOffset, SeekOrigin.Begin);
+                ReadLumpWrapper<BodyPartHeader>.ReadLumpFromStream(reader.BaseStream, numBodyParts, bodyPart =>
+                {
+                    reader.BaseStream.Seek(bodyPart.ModelOffset, SeekOrigin.Current);
+                    ReadLumpWrapper<ModelHeader>.ReadLumpFromStream(reader.BaseStream, bodyPart.NumModels, model =>
+                    {
+                        reader.BaseStream.Seek(model.LodOffset, SeekOrigin.Current);
+
+                        var lodIndex = 0;
+                        ReadLumpWrapper<ModelLodHeader>.ReadLumpFromStream(reader.BaseStream, model.NumLods, lod =>
+                        {
+                            if (lodIndex++ != lodLevel) return;
+
+                            reader.BaseStream.Seek(lod.MeshOffset, SeekOrigin.Current);
+                            ReadLumpWrapper<MeshHeader>.ReadLumpFromStream(reader.BaseStream, lod.NumMeshes, mesh =>
+                            {
+                                reader.BaseStream.Seek(mesh.StripGroupHeaderOffset, SeekOrigin.Current);
+                                ReadLumpWrapper<StripGroupHeader>.ReadLumpFromStream(reader.BaseStream, mesh.NumStripGroups, stripGroup =>
+                                {
+                                    var start = reader.BaseStream.Position;
+                                    reader.BaseStream.Seek(start + stripGroup.VertOffset, SeekOrigin.Begin);
+                                    var verts = ReadLumpWrapper<OptimizedVertex>.ReadLumpFromStream(reader.BaseStream,
+                                        stripGroup.NumVerts);
+
+                                    reader.BaseStream.Seek(start + stripGroup.IndexOffset, SeekOrigin.Begin);
+                                    var indices = ReadLumpWrapper<ushort>.ReadLumpFromStream(reader.BaseStream,
+                                        stripGroup.NumIndices);
+
+                                    reader.BaseStream.Seek(start + stripGroup.StripOffset, SeekOrigin.Begin);
+                                    ReadLumpWrapper<StripHeader>.ReadLumpFromStream(reader.BaseStream, stripGroup.NumStrips, strip =>
+                                    {
+                                        stripIndices.Clear();
+
+                                        for (var i = 0; i < strip.NumIndices; ++i)
+                                        {
+                                            var index = indices[strip.IndexOffset + i];
+                                            var vert = verts[index];
+
+                                            stripIndices.Add(vert.OrigMeshVertId);
+                                        }
+
+                                        switch (strip.Flags)
+                                        {
+                                            case StripHeaderFlags.IsTriList:
+                                                outIndices.AddRange(stripIndices);
+                                                break;
+                                            case StripHeaderFlags.IsTriStrip:
+                                                for (var i = 2; i < stripIndices.Count; ++i)
+                                                {
+                                                    switch (i & 1)
+                                                    {
+                                                        case 0:
+                                                            outIndices.Add(stripIndices[i - 2]);
+                                                            outIndices.Add(stripIndices[i - 1]);
+                                                            break;
+                                                        case 1:
+                                                            outIndices.Add(stripIndices[i - 1]);
+                                                            outIndices.Add(stripIndices[i - 2]);
+                                                            break;
+                                                    }
+                                                    outIndices.Add(stripIndices[i]);
+                                                }
+                                                break;
+                                        }
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
             }
+
+            return outIndices.ToArray();
         }
 
-        public Mesh GetMesh(int lod)
+        [ThreadStatic]
+        private static List<Vector3> _sVertices;
+        [ThreadStatic]
+        private static List<Vector3> _sNormals;
+
+        public Mesh GetMesh(int lodLevel)
         {
             Mesh mesh;
-            if (_lods.TryGetValue(lod, out mesh)) return mesh;
+            if (_lods.TryGetValue(lodLevel, out mesh)) return mesh;
 
             mesh = new Mesh();
 
             var verts = GetVertices();
+            var indices = GetTriangles(lodLevel);
 
-            _lods.Add(lod, mesh);
+            if (_sVertices == null) _sVertices = new List<Vector3>();
+            else _sVertices.Clear();
+
+            if (_sNormals == null) _sNormals = new List<Vector3>();
+            else _sNormals.Clear();
+
+            var transform = Matrix4x4.TRS(Vector3.zero, Quaternion.AngleAxis(-90f, Vector3.up), Vector3.one);
+
+            for (var i = 0; i < verts.Length; ++i)
+            {
+                _sVertices.Add(transform*((Vector3) verts[i].Position*VBspFile.SourceToUnityUnits));
+                _sNormals.Add(transform*(Vector3) verts[i].Normal);
+            }
+
+            mesh.SetVertices(_sVertices);
+            mesh.SetNormals(_sNormals);
+            mesh.SetIndices(indices, MeshTopology.Triangles, 0);
+
+            _lods.Add(lodLevel, mesh);
             return mesh;
         }
     }

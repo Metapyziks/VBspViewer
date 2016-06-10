@@ -127,7 +127,7 @@ Prefab:
     - target: {fileID: 3380982, guid: 4d293c8e162f3874b982baadd71153d2, type: 2}
       propertyPath: m_Mesh
       value: 
-      objectReference: {fileID: 1315785238}
+      objectReference: {fileID: 1469222846}
     - target: {fileID: 420908, guid: 4d293c8e162f3874b982baadd71153d2, type: 2}
       propertyPath: m_LocalScale.x
       value: 64
@@ -143,7 +143,7 @@ Prefab:
     m_RemovedComponents: []
   m_ParentPrefab: {fileID: 100100000, guid: 4d293c8e162f3874b982baadd71153d2, type: 2}
   m_IsPrefabParent: 0
---- !u!43 &1315785238
+--- !u!43 &1469222846
 Mesh:
   m_ObjectHideFlags: 0
   m_PrefabParentObject: {fileID: 0}
@@ -313,8 +313,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 104b98ee950966345b14f77b9c37c610, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  FilePath: de_mirage.bsp
-  Material: {fileID: 2100000, guid: bc53a50f47bbfce41992abca9b6af971, type: 2}
+  FilePath: de_lake.bsp
+  WorldMaterial: {fileID: 2100000, guid: bc53a50f47bbfce41992abca9b6af971, type: 2}
+  PropMaterial: {fileID: 10302, guid: 0000000000000000f000000000000000, type: 0}
   Lightmap: {fileID: 0}
 --- !u!4 &1929632567
 Transform:
