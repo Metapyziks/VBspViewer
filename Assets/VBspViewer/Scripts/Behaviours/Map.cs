@@ -20,8 +20,6 @@ namespace VBspViewer.Behaviours
         private VBspFile _bspFile;
         private readonly ResourceLoader _resLoader = new ResourceLoader();
 
-        private MeshFilter _primitiveProvider;
-
         [UsedImplicitly]
         private void Start()
         {
@@ -62,8 +60,6 @@ namespace VBspViewer.Behaviours
             entParent.transform.SetParent(transform, true);
 
             var keyVals = new Dictionary<string, EntValue>();
-
-            _primitiveProvider = GameObject.CreatePrimitive(PrimitiveType.Cube).GetComponent<MeshFilter>();
 
             foreach (var entInfo in _bspFile.GetEntityKeyVals())
             {
@@ -117,14 +113,44 @@ namespace VBspViewer.Behaviours
                     case "light_environment":
                     {
                         var light = obj.AddComponent<Light>();
+                        var color = (Color) keyVals["_light"];
+                        var ambient = (Color) keyVals["_ambient"];
 
+                        var pow = ambient.a;
+
+                        ambient = new Color(Mathf.Pow(ambient.r, pow), Mathf.Pow(ambient.g, pow), Mathf.Pow(ambient.b, pow));
+
+                        light.color = color;
+                        light.intensity = 1f;
                         light.shadows = LightShadows.Soft;
                         light.type = LightType.Directional;
 
-                        WorldMaterial.SetColor("_AmbientColor", (Color) keyVals["_ambient"]);
+                        const float colorPow = 2.2f;
+                        const float colorScale = 0.5f;
+
+                        RenderSettings.ambientLight = new Color(
+                            Mathf.Pow(ambient.r, colorPow) * colorScale,
+                            Mathf.Pow(ambient.g, colorPow) * colorScale,
+                            Mathf.Pow(ambient.b, colorPow) * colorScale);
+                        DynamicGI.UpdateEnvironment();
+
+                        WorldMaterial.SetColor("_AmbientColor", ambient);
                         enable = true;
                         break;
                     }
+                    //case "light":
+                    //{
+                    //    var light = obj.AddComponent<Light>();
+                    //    var color = (Color) keyVals["_light"];
+
+                    //    light.color = color;
+                    //    light.intensity = 1f;
+                    //    light.bounceIntensity = 0f;
+                    //    light.range = Mathf.Sqrt(color.a) * 255f * VBspFile.SourceToUnityUnits * 8f;
+
+                    //    enable = true;
+                    //    break;
+                    //}
                     case "prop_static":
                     {
                         var modelName = (string) keyVals["model"];
@@ -152,6 +178,8 @@ namespace VBspViewer.Behaviours
                 
                 obj.SetActive(enable);
             }
+
+            Profiler.Print();
         }
     }
 }

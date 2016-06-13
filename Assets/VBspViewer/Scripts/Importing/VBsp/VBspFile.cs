@@ -27,38 +27,47 @@ namespace VBspViewer.Importing.VBsp
             var delegates = GetReadLumpDelegates();
             var srcBuffer = new byte[0];
             
-            for (var lumpIndex = 0; lumpIndex < Header.LumpInfoCount; ++lumpIndex)
+            using (Profiler.Begin("ReadLumps"))
             {
-                var info = _header.Lumps[lumpIndex];
-
-                if ((LumpType) lumpIndex == LumpType.LUMP_GAME_LUMP)
+                for (var lumpIndex = 0; lumpIndex < Header.LumpInfoCount; ++lumpIndex)
                 {
-                    Debug.LogFormat("{0} Start: 0x{1:x}, Length: 0x{2:x}", LumpType.LUMP_GAME_LUMP, info.Offset, info.Length);
+                    var info = _header.Lumps[lumpIndex];
 
-                    stream.Seek(info.Offset, SeekOrigin.Begin);
-                    var lumpCount = reader.ReadInt32();
-                    GameLumps = new GameLumpInfo[lumpCount];
-                    for (var i = 0; i < lumpCount; ++i) GameLumps[i] = new GameLumpInfo(reader);
-                    for (var i = 0; i < lumpCount; ++i) GameLumps[i].ReadContents(stream);
-                    continue;
+                    if ((LumpType) lumpIndex == LumpType.LUMP_GAME_LUMP)
+                    {
+                        Debug.LogFormat("{0} Start: 0x{1:x}, Length: 0x{2:x}", LumpType.LUMP_GAME_LUMP, info.Offset, info.Length);
+
+                        using (Profiler.Begin("ReadLump({0})", LumpType.LUMP_GAME_LUMP))
+                        {
+                            stream.Seek(info.Offset, SeekOrigin.Begin);
+                            var lumpCount = reader.ReadInt32();
+                            GameLumps = new GameLumpInfo[lumpCount];
+                            for (var i = 0; i < lumpCount; ++i) GameLumps[i] = new GameLumpInfo(reader);
+                            for (var i = 0; i < lumpCount; ++i) GameLumps[i].ReadContents(stream);
+                        }
+                        continue;
+                    }
+
+                    ReadLumpDelegate deleg;
+                    if (!delegates.TryGetValue((LumpType) lumpIndex, out deleg)) continue;
+
+                    Debug.LogFormat("{0} Start: 0x{1:x}, Length: 0x{2:x}", (LumpType) lumpIndex, info.Offset, info.Length);
+
+                    using (Profiler.Begin("ReadLump({0})", (LumpType) lumpIndex))
+                    {
+                        if (srcBuffer.Length < info.Length)
+                        {
+                            srcBuffer = new byte[Mathf.NextPowerOfTwo(info.Length)];
+                        }
+
+                        stream.Seek(info.Offset, SeekOrigin.Begin);
+                        var read = stream.Read(srcBuffer, 0, info.Length);
+
+                        Debug.Assert(read == info.Length);
+
+                        deleg(this, srcBuffer, info.Length);
+                    }
                 }
-
-                ReadLumpDelegate deleg;
-                if (!delegates.TryGetValue((LumpType) lumpIndex, out deleg)) continue;
-
-                Debug.LogFormat("{0} Start: 0x{1:x}, Length: 0x{2:x}", (LumpType) lumpIndex, info.Offset, info.Length);
-
-                if (srcBuffer.Length < info.Length)
-                {
-                    srcBuffer = new byte[Mathf.NextPowerOfTwo(info.Length)];
-                }
-
-                stream.Seek(info.Offset, SeekOrigin.Begin);
-                var read = stream.Read(srcBuffer, 0, info.Length);
-
-                Debug.Assert(read == info.Length);
-
-                deleg(this, srcBuffer, info.Length);
             }
         }
         
@@ -107,9 +116,6 @@ namespace VBspViewer.Importing.VBsp
         [Lump(Type = LumpType.LUMP_DISP_VERTS)]
         private DispVert[] DispVerts { get; set; }
 
-        [Lump(Type = LumpType.LUMP_DISP_LIGHTMAP_SAMPLE_POSITIONS)]
-        private int[] DispLightmapSampleIndices { get; set; }
-
         [Lump(Type = LumpType.LUMP_ENTITIES)]
         private byte[] Entities { get; set; }
 
@@ -139,47 +145,53 @@ namespace VBspViewer.Importing.VBsp
             var litFaces = FacesHdr.Count(x => x.LightOffset != -1);
             var textures = new Texture2D[litFaces];
 
-            var texIndex = 0;
-            foreach (var face in FacesHdr)
+            using (Profiler.Begin("ReadLightmapSubtextures"))
             {
-                if (face.LightOffset == -1) continue;
-
-                var samplesWidth = face.LightMapSizeX + 1;
-                var samplesHeight = face.LightMapSizeY + 1;
-
-                var subTex = new Texture2D(samplesWidth, samplesHeight, TextureFormat.RGB24, false);
-                
-                for (var x = 0; x < samplesWidth; ++x)
-                for (var y = 0; y < samplesHeight; ++y)
+                var texIndex = 0;
+                foreach (var face in FacesHdr)
                 {
-                    var index = face.LightOffset + ((x + y*samplesWidth) << 2);
-                        
-                    var r = LightmapSamplesHdr[index + 0];
-                    var g = LightmapSamplesHdr[index + 1];
-                    var b = LightmapSamplesHdr[index + 2];
-                    var e = (sbyte) LightmapSamplesHdr[index + 3];
+                    if (face.LightOffset == -1) continue;
 
-                    subTex.SetPixel(x, y, new LightmapSample { R = r, G = g, B = b, Exponent = e});
+                    var samplesWidth = face.LightMapSizeX + 1;
+                    var samplesHeight = face.LightMapSizeY + 1;
+
+                    var subTex = new Texture2D(samplesWidth, samplesHeight, TextureFormat.RGB24, false);
+
+                    for (var x = 0; x < samplesWidth; ++x)
+                        for (var y = 0; y < samplesHeight; ++y)
+                        {
+                            var index = face.LightOffset + ((x + y*samplesWidth) << 2);
+
+                            var r = LightmapSamplesHdr[index + 0];
+                            var g = LightmapSamplesHdr[index + 1];
+                            var b = LightmapSamplesHdr[index + 2];
+                            var e = (sbyte) LightmapSamplesHdr[index + 3];
+
+                            subTex.SetPixel(x, y, new LightmapSample {R = r, G = g, B = b, Exponent = e});
+                        }
+
+                    textures[texIndex++] = subTex;
+                }
+            }
+
+            using (Profiler.Begin("GenerateLightmap"))
+            {
+                _lightmapRects.Clear();
+                var rects = texture.PackTextures(textures, 0);
+
+                var texIndex = 0;
+                for (var faceIndex = 0; faceIndex < FacesHdr.Length; ++faceIndex)
+                {
+                    var face = FacesHdr[faceIndex];
+                    if (face.LightOffset == -1) continue;
+
+                    var rect = rects[texIndex++];
+                    _lightmapRects.Add(faceIndex, rect);
                 }
 
-                textures[texIndex++] = subTex;
+                texture.Apply();
+                return texture;
             }
-
-            _lightmapRects.Clear();
-            var rects = texture.PackTextures(textures, 0);
-
-            texIndex = 0;
-            for (var faceIndex = 0; faceIndex < FacesHdr.Length; ++faceIndex)
-            {
-                var face = FacesHdr[faceIndex];
-                if (face.LightOffset == -1) continue;
-
-                var rect = rects[texIndex++];
-                _lightmapRects.Add(faceIndex, rect);
-            }
-
-            texture.Apply();
-            return texture;
         }
 
         private static Vector2 GetUv(Vector3 pos, TexAxis uAxis, TexAxis vAxis)
@@ -251,28 +263,67 @@ namespace VBspViewer.Importing.VBsp
 
             var corners = new Vector3[4];
 
-            foreach (var faceIndex in faceIndices)
+            using (Profiler.Begin("GenerateMesh"))
             {
-                var face = FacesHdr[faceIndex];
-                var plane = Planes[face.PlaneNum];
-                var tex = TexInfos[face.TexInfo];
-
-                if ((tex.Flags & ignoreFlags) != 0) continue;
-
-                Rect lightmapRect;
-                if (!_lightmapRects.TryGetValue(faceIndex, out lightmapRect))
+                foreach (var faceIndex in faceIndices)
                 {
-                    lightmapRect = new Rect(0f, 0f, 1f, 1f);
-                }
+                    var face = FacesHdr[faceIndex];
+                    var plane = Planes[face.PlaneNum];
+                    var tex = TexInfos[face.TexInfo];
 
-                if (face.DispInfo != -1)
-                {
-                    Debug.Assert(face.NumEdges == 4);
+                    if ((tex.Flags & ignoreFlags) != 0) continue;
 
-                    var disp = DispInfos[face.DispInfo];
-                    var size = 1 << disp.Power;
-                    var firstCorner = 0;
-                    var firstCornerDist2 = float.MaxValue;
+                    Rect lightmapRect;
+                    if (!_lightmapRects.TryGetValue(faceIndex, out lightmapRect))
+                    {
+                        lightmapRect = new Rect(0f, 0f, 1f, 1f);
+                    }
+
+                    if (face.DispInfo != -1)
+                    {
+                        Debug.Assert(face.NumEdges == 4);
+
+                        var disp = DispInfos[face.DispInfo];
+                        var size = 1 << disp.Power;
+                        var firstCorner = 0;
+                        var firstCornerDist2 = float.MaxValue;
+
+                        for (var surfId = face.FirstEdge; surfId < face.FirstEdge + face.NumEdges; ++surfId)
+                        {
+                            var surfEdge = SurfEdges[surfId];
+                            var edgeIndex = Math.Abs(surfEdge);
+                            var edge = Edges[edgeIndex];
+                            var vert = Vertices[surfEdge >= 0 ? edge.A : edge.B];
+
+                            corners[surfId - face.FirstEdge] = vert;
+
+                            var dist2 = ((Vector3) disp.StartPosition - vert).sqrMagnitude;
+                            if (dist2 < firstCornerDist2)
+                            {
+                                firstCorner = surfId - face.FirstEdge;
+                                firstCornerDist2 = dist2;
+                            }
+                        }
+
+                        for (var x = 0; x < size; ++x)
+                            for (var y = 0; y < size; ++y)
+                            {
+                                var a = GetDisplacementVertex(disp.DispVertStart, x, y,         size, corners, firstCorner);
+                                var b = GetDisplacementVertex(disp.DispVertStart, x, y + 1,     size, corners, firstCorner);
+                                var c = GetDisplacementVertex(disp.DispVertStart, x + 1, y + 1, size, corners, firstCorner);
+                                var d = GetDisplacementVertex(disp.DispVertStart, x + 1, y,     size, corners, firstCorner);
+
+                                meshGen.StartFace();
+                                meshGen.AddVertex(a * SourceToUnityUnits, plane.Normal, GetLightmapUv(x, y, size, face, lightmapRect));
+                                meshGen.AddVertex(b * SourceToUnityUnits, plane.Normal, GetLightmapUv(x, y + 1, size, face, lightmapRect));
+                                meshGen.AddVertex(c * SourceToUnityUnits, plane.Normal, GetLightmapUv(x + 1, y + 1, size, face, lightmapRect));
+                                meshGen.AddVertex(d * SourceToUnityUnits, plane.Normal, GetLightmapUv(x + 1, y, size, face, lightmapRect));
+                                meshGen.AddPrimitive(PrimitiveType.TriangleStrip);
+                                meshGen.EndFace();
+                            }
+
+                        continue;
+                    }
 
                     for (var surfId = face.FirstEdge; surfId < face.FirstEdge + face.NumEdges; ++surfId)
                     {
@@ -280,71 +331,35 @@ namespace VBspViewer.Importing.VBsp
                         var edgeIndex = Math.Abs(surfEdge);
                         var edge = Edges[edgeIndex];
                         var vert = Vertices[surfEdge >= 0 ? edge.A : edge.B];
+                        var lightmapUv = GetLightmapUv(vert, face, tex, lightmapRect);
 
-                        corners[surfId - face.FirstEdge] = vert;
-
-                        var dist2 = ((Vector3) disp.StartPosition - vert).sqrMagnitude;
-                        if (dist2 < firstCornerDist2)
-                        {
-                            firstCorner = surfId - face.FirstEdge;
-                            firstCornerDist2 = dist2;
-                        }
+                        meshGen.AddVertex((Vector3) vert * SourceToUnityUnits, plane.Normal, lightmapUv);
                     }
 
-                    for (var x = 0; x < size; ++x)
-                    for (var y = 0; y < size; ++y)
+                    if (face.NumPrimitives == 0)
                     {
-                        var a = GetDisplacementVertex(disp.DispVertStart, x, y,         size, corners, firstCorner);
-                        var b = GetDisplacementVertex(disp.DispVertStart, x, y + 1,     size, corners, firstCorner);
-                        var c = GetDisplacementVertex(disp.DispVertStart, x + 1, y + 1, size, corners, firstCorner);
-                        var d = GetDisplacementVertex(disp.DispVertStart, x + 1, y,     size, corners, firstCorner);
-                        
-                        meshGen.StartFace();
-                        meshGen.AddVertex(a * SourceToUnityUnits, plane.Normal, GetLightmapUv(x, y, size, face, lightmapRect));
-                        meshGen.AddVertex(b * SourceToUnityUnits, plane.Normal, GetLightmapUv(x, y + 1, size, face, lightmapRect));
-                        meshGen.AddVertex(c * SourceToUnityUnits, plane.Normal, GetLightmapUv(x + 1, y + 1, size, face, lightmapRect));
-                        meshGen.AddVertex(d * SourceToUnityUnits, plane.Normal, GetLightmapUv(x + 1, y, size, face, lightmapRect));
                         meshGen.AddPrimitive(PrimitiveType.TriangleStrip);
                         meshGen.EndFace();
+                        continue;
                     }
 
-                    continue;
-                }
-
-                for (var surfId = face.FirstEdge; surfId < face.FirstEdge + face.NumEdges; ++surfId)
-                {
-                    var surfEdge = SurfEdges[surfId];
-                    var edgeIndex = Math.Abs(surfEdge);
-                    var edge = Edges[edgeIndex];
-                    var vert = Vertices[surfEdge >= 0 ? edge.A : edge.B];
-                    var lightmapUv = GetLightmapUv(vert, face, tex, lightmapRect);
-
-                    meshGen.AddVertex((Vector3) vert * SourceToUnityUnits, plane.Normal, lightmapUv);
-                }
-
-                if (face.NumPrimitives == 0)
-                {
-                    meshGen.AddPrimitive(PrimitiveType.TriangleStrip);
-                    meshGen.EndFace();
-                    continue;
-                }
-
-                for (var primId = face.FirstPrimitive; primId < face.FirstPrimitive + face.NumPrimitives; ++primId)
-                {
-                    var primitive = Primitives[primId];
-                    for (var indexId = primitive.FirstIndex;
-                        indexId < primitive.FirstIndex + primitive.IndexCount;
-                        ++indexId)
+                    for (var primId = face.FirstPrimitive; primId < face.FirstPrimitive + face.NumPrimitives; ++primId)
                     {
-                        primitiveIndices.Add(PrimitiveIndices[indexId]);
+                        var primitive = Primitives[primId];
+                        for (var indexId = primitive.FirstIndex;
+                            indexId < primitive.FirstIndex + primitive.IndexCount;
+                            ++indexId)
+                        {
+                            primitiveIndices.Add(PrimitiveIndices[indexId]);
+                        }
+
+                        meshGen.AddPrimitive(primitive.Type, primitiveIndices);
+
+                        primitiveIndices.Clear();
                     }
 
-                    meshGen.AddPrimitive(primitive.Type, primitiveIndices);
-
-                    primitiveIndices.Clear();
+                    meshGen.EndFace();
                 }
-
-                meshGen.EndFace();
             }
 
             meshGen.CopyToMesh(mesh);

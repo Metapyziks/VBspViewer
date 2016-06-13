@@ -50,8 +50,9 @@
             {
                 float atten = LIGHT_ATTENUATION( i ) * i.shade;
                 fixed3 lightmap = tex2D( _LightMap, i.uv2 ).rgb;
+                fixed3 shadow = atten * fixed3( 1, 1, 1 ) + (1 - atten) * _AmbientColor.rgb;
 
-                return fixed4( atten * lightmap + (1 - atten) * lightmap * _AmbientColor.rgb, 1 );
+                return fixed4( shadow * pow(lightmap, 1 / 1.6), 1 );
             }
             ENDCG
         }
