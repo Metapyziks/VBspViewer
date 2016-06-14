@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace VBspViewer.Importing.Vpk
 {
@@ -145,6 +146,7 @@ namespace VBspViewer.Importing.Vpk
 
             _archiveFileNameFormat = dirFilePath.Substring(0, dirFilePath.Length - dirPostfix.Length) + "_{0:000}.vpk";
 
+            using (Profiler.Begin("ReadDirectory"))
             using (var stream = File.Open(dirFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 ReadDirectory(stream);
@@ -195,7 +197,8 @@ namespace VBspViewer.Importing.Vpk
             }
         }
 
-        private readonly Dictionary<string, DirectoryEntry> _fileDict = new Dictionary<string, DirectoryEntry>(StringComparer.InvariantCultureIgnoreCase);
+        private readonly Dictionary<string, Dictionary<string, Dictionary<string, DirectoryEntry>>> _fileDict
+            = new Dictionary<string, Dictionary<string, Dictionary<string, DirectoryEntry>>>(StringComparer.InvariantCultureIgnoreCase);
 
         private void ReadDirectory(Stream stream)
         {
@@ -218,26 +221,39 @@ namespace VBspViewer.Importing.Vpk
                 var ext = ReadNullTerminatedString(reader);
                 if (ext.Length == 0) break;
 
+                Dictionary<string, Dictionary<string, DirectoryEntry>> extDict;
+                if (!_fileDict.TryGetValue(ext, out extDict))
+                {
+                    extDict = new Dictionary<string, Dictionary<string, DirectoryEntry>>(StringComparer.InvariantCultureIgnoreCase);
+                    _fileDict.Add(ext, extDict);
+                }
+
                 while (true)
                 {
                     var path = ReadNullTerminatedString(reader);
                     if (path.Length == 0) break;
+
+                    Dictionary<string, DirectoryEntry> dirDict;
+                    if (!extDict.TryGetValue(path, out dirDict))
+                    {
+                        dirDict = new Dictionary<string, DirectoryEntry>(StringComparer.InvariantCultureIgnoreCase);
+                        extDict.Add(path, dirDict);
+                    }
 
                     while (true)
                     {
                         var name = ReadNullTerminatedString(reader);
                         if (name.Length == 0) break;
 
-                        var fullPath = string.Format("{0}/{1}.{2}", path, name, ext);
                         var entry = new DirectoryEntry(reader);
 
-                        if (_fileDict.ContainsKey(fullPath))
+                        if (dirDict.ContainsKey(name))
                         {
-                            _fileDict[fullPath] = entry;
+                            dirDict[name] = entry;
                         }
                         else
                         {
-                            _fileDict.Add(fullPath, entry);
+                            dirDict.Add(name, entry);
                         }
                     }
                 }
@@ -291,15 +307,48 @@ namespace VBspViewer.Importing.Vpk
             }
         }
 
+        private void SplitFileName(string fileName, out string ext, out string path, out string name)
+        {
+            var dirSep = fileName.LastIndexOf('/');
+            var extSep = fileName.LastIndexOf('.');
+
+            ext = fileName.Substring(extSep + 1);
+            path = fileName.Substring(0, dirSep);
+            name = fileName.Substring(dirSep + 1, extSep - dirSep - 1);
+        }
+
         public bool ContainsFile(string fileName)
         {
-            return _fileDict.ContainsKey(fileName);
+            string ext, path, name;
+            SplitFileName(fileName, out ext, out path, out name);
+
+            Dictionary<string, Dictionary<string, DirectoryEntry>> extDict;
+            if (!_fileDict.TryGetValue(ext, out extDict)) return false;
+
+            Dictionary<string, DirectoryEntry> dirDict;
+            if (!extDict.TryGetValue(path, out dirDict)) return false;
+
+            return dirDict.ContainsKey(name);
+        }
+
+        private static Exception FileNotFound(string fileName)
+        {
+            throw new FileNotFoundException(string.Format("Cound not find file '{0}' in VPK archive.", fileName), fileName);
         }
 
         public Stream OpenFile(string fileName)
         {
+            string ext, path, name;
+            SplitFileName(fileName, out ext, out path, out name);
+
+            Dictionary<string, Dictionary<string, DirectoryEntry>> extDict;
+            if (!_fileDict.TryGetValue(ext, out extDict)) throw FileNotFound(fileName);
+
+            Dictionary<string, DirectoryEntry> dirDict;
+            if (!extDict.TryGetValue(path, out dirDict)) throw FileNotFound(fileName);
+
             DirectoryEntry entry;
-            if (!_fileDict.TryGetValue(fileName, out entry)) throw new FileNotFoundException();
+            if (!dirDict.TryGetValue(name, out entry)) throw FileNotFound(fileName);
 
             return new VpkStream(this, entry.ArchiveIndex, entry.EntryOffset, entry.EntryLength, entry.PreloadData);
         }

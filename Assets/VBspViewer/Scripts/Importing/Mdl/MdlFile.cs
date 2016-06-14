@@ -220,11 +220,11 @@ namespace VBspViewer.Importing.Mdl
             return _vertices;
         }
 
-        private int[] GetTriangles(int lodLevel = 0)
+        private int[][] GetTriangles(int lodLevel = 0)
         {
             var filePath = _baseFilename + ".dx90.vtx";
 
-            var outIndices = new List<int>();
+            var outIndices = new List<List<int>>();
 
             using (var stream = _loader.OpenFile(filePath))
             using (var reader = new BinaryReader(stream))
@@ -263,16 +263,15 @@ namespace VBspViewer.Importing.Mdl
                             if (lodIndex++ != lodLevel) return;
 
                             var meshIndex = 0;
+                            var skip = 0;
 
                             reader.BaseStream.Seek(lod.MeshOffset, SeekOrigin.Current);
                             ReadLumpWrapper<MeshHeader>.ReadLumpFromStream(reader.BaseStream, lod.NumMeshes, mesh =>
                             {
-                                if (meshIndex++ != 0)
-                                {
-                                    Debug.LogFormat("MultiMesh: {0}", _baseFilename);
-                                    return;
-                                }
-
+                                List<int> meshIndices;
+                                if (outIndices.Count <= meshIndex) outIndices.Add(meshIndices = new List<int>());
+                                else meshIndices = outIndices[meshIndex];
+                                
                                 reader.BaseStream.Seek(mesh.StripGroupHeaderOffset, SeekOrigin.Current);
                                 ReadLumpWrapper<StripGroupHeader>.ReadLumpFromStream(reader.BaseStream, mesh.NumStripGroups, stripGroup =>
                                 {
@@ -287,28 +286,33 @@ namespace VBspViewer.Importing.Mdl
                                     reader.BaseStream.Seek(start + stripGroup.IndexOffset, SeekOrigin.Begin);
                                     ReadLumpWrapper<ushort>.ReadLumpFromStream(reader.BaseStream,
                                         stripGroup.NumIndices, indices);
-
+                                    
                                     reader.BaseStream.Seek(start + stripGroup.StripOffset, SeekOrigin.Begin);
                                     ReadLumpWrapper<StripHeader>.ReadLumpFromStream(reader.BaseStream, stripGroup.NumStrips, strip =>
                                     {
                                         Debug.Assert(strip.Flags == StripHeaderFlags.IsTriList);
-
+                                        
                                         for (var i = 0; i < strip.NumIndices; ++i)
                                         {
                                             var index = indices[strip.IndexOffset + i];
                                             var vert = verts[index];
 
-                                            outIndices.Add(strip.VertOffset + vert.OrigMeshVertId);
+                                            meshIndices.Add(strip.VertOffset + vert.OrigMeshVertId + skip);
                                         }
                                     });
+
+                                    // Why?
+                                    skip += verts.Max(x => x.OrigMeshVertId) + 1;
                                 });
+
+                                meshIndex += 1;
                             });
                         });
                     });
                 });
             }
 
-            return outIndices.ToArray();
+            return outIndices.Select(x => x.ToArray()).ToArray();
         }
 
         [ThreadStatic]
@@ -322,12 +326,12 @@ namespace VBspViewer.Importing.Mdl
             if (_lods.TryGetValue(lodLevel, out mesh)) return mesh;
 
             mesh = new Mesh();
-
+            
             using (Profiler.Begin("BuildPropMesh"))
             { 
                 var verts = GetVertices();
                 var indices = GetTriangles(lodLevel);
-
+                
                 if (_sVertices == null) _sVertices = new List<Vector3>();
                 else _sVertices.Clear();
 
@@ -344,7 +348,13 @@ namespace VBspViewer.Importing.Mdl
 
                 mesh.SetVertices(_sVertices);
                 mesh.SetNormals(_sNormals);
-                mesh.SetIndices(indices, MeshTopology.Triangles, 0);
+
+                mesh.subMeshCount = indices.Length;
+
+                for (var i = 0; i < indices.Length; ++i)
+                {
+                    mesh.SetIndices(indices[i], MeshTopology.Triangles, i);
+                }
 
                 _lods.Add(lodLevel, mesh);
                 return mesh;

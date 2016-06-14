@@ -11,6 +11,19 @@ namespace VBspViewer.Behaviours
 {
     public class Map : MonoBehaviour
     {
+        private static readonly ResourceLoader _sResources = new ResourceLoader();
+        public static ResourceLoader Resources { get { return _sResources; } }
+
+        static Map()
+        {
+            var vpkDirPath = Path.Combine(Config.CsgoPath, "pak01_dir.vpk");
+
+            using (Profiler.Begin("OpenVpkArchive"))
+            {
+                Resources.AddResourceProvider(new VpkArchve(vpkDirPath));
+            }
+        }
+
         public string FilePath;
         public Material WorldMaterial;
         public Material PropMaterial;
@@ -18,13 +31,11 @@ namespace VBspViewer.Behaviours
         public Texture2D Lightmap;
 
         private VBspFile _bspFile;
-        private readonly ResourceLoader _resLoader = new ResourceLoader();
 
         [UsedImplicitly]
         private void Start()
         {
             var filePath = Path.Combine(Config.CsgoPath, Path.Combine("maps", FilePath));
-            var vpkDirPath = Path.Combine(Config.CsgoPath, "pak01_dir.vpk");
 
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
@@ -35,8 +46,6 @@ namespace VBspViewer.Behaviours
             {
                 _bspFile = new VBspFile(stream);
             }
-
-            _resLoader.AddResourceProvider(new VpkArchve(vpkDirPath));
 
             Lightmap = _bspFile.GenerateLightmap();
             var meshes = _bspFile.GenerateMeshes();
@@ -61,122 +70,113 @@ namespace VBspViewer.Behaviours
 
             var keyVals = new Dictionary<string, EntValue>();
 
-            foreach (var entInfo in _bspFile.GetEntityKeyVals())
+            using (Profiler.Begin("CreateEntities"))
             {
-                string className = null;
-                string targetName = null;
-                var origin = Vector3.zero;
-                var angles = Quaternion.identity;
-                var pitch = 0f;
-
-                keyVals.Clear();
-
-                foreach (var keyVal in entInfo)
+                foreach (var entInfo in _bspFile.GetEntityKeyVals())
                 {
-                    switch (keyVal.Key)
+                    string className = null;
+                    string targetName = null;
+                    var origin = Vector3.zero;
+                    var angles = Quaternion.identity;
+                    var pitch = 0f;
+
+                    keyVals.Clear();
+
+                    foreach (var keyVal in entInfo)
                     {
-                        case "classname":
-                            className = (string) keyVal.Value;
-                            break;
-                        case "targetname":
-                            targetName = (string) keyVal.Value;
-                            break;
-                        case "origin":
-                            origin = (Vector3) keyVal.Value * VBspFile.SourceToUnityUnits;
-                            break;
-                        case "angles":
-                            angles = (Quaternion) keyVal.Value;
-                            break;
-                        case "pitch":
-                            pitch = (float) keyVal.Value;
-                            break;
-                       
-                        default:
-                            if (keyVals.ContainsKey(keyVal.Key)) continue;
-                            keyVals.Add(keyVal.Key, keyVal.Value);
-                            break;
-                    }
-                }
-
-                var obj = new GameObject(targetName ?? className);
-                obj.transform.SetParent(entParent.transform, true);
-
-                angles *= Quaternion.AngleAxis(-pitch, Vector3.right);
-
-                obj.transform.position = origin;
-                obj.transform.rotation = angles;
-
-                var enable = false;
-
-                switch (className)
-                {
-                    case "light_environment":
-                    {
-                        var light = obj.AddComponent<Light>();
-                        var color = (Color) keyVals["_light"];
-                        var ambient = (Color) keyVals["_ambient"];
-
-                        var pow = ambient.a;
-
-                        ambient = new Color(Mathf.Pow(ambient.r, pow), Mathf.Pow(ambient.g, pow), Mathf.Pow(ambient.b, pow));
-
-                        light.color = color;
-                        light.intensity = 1f;
-                        light.shadows = LightShadows.Soft;
-                        light.type = LightType.Directional;
-
-                        const float colorPow = 2.2f;
-                        const float colorScale = 0.5f;
-
-                        RenderSettings.ambientLight = new Color(
-                            Mathf.Pow(ambient.r, colorPow) * colorScale,
-                            Mathf.Pow(ambient.g, colorPow) * colorScale,
-                            Mathf.Pow(ambient.b, colorPow) * colorScale);
-                        DynamicGI.UpdateEnvironment();
-
-                        WorldMaterial.SetColor("_AmbientColor", ambient);
-                        enable = true;
-                        break;
-                    }
-                    //case "light":
-                    //{
-                    //    var light = obj.AddComponent<Light>();
-                    //    var color = (Color) keyVals["_light"];
-
-                    //    light.color = color;
-                    //    light.intensity = 1f;
-                    //    light.bounceIntensity = 0f;
-                    //    light.range = Mathf.Sqrt(color.a) * 255f * VBspFile.SourceToUnityUnits * 8f;
-
-                    //    enable = true;
-                    //    break;
-                    //}
-                    case "prop_static":
-                    {
-                        var modelName = (string) keyVals["model"];
-
-                        try
+                        switch (keyVal.Key)
                         {
-                            var mdl = _resLoader.LoadMdl(modelName);
+                            case "classname":
+                                className = (string) keyVal.Value;
+                                break;
+                            case "targetname":
+                                targetName = (string) keyVal.Value;
+                                break;
+                            case "origin":
+                                origin = (Vector3) keyVal.Value * VBspFile.SourceToUnityUnits;
+                                break;
+                            case "angles":
+                                angles = (Quaternion) keyVal.Value;
+                                break;
+                            case "pitch":
+                                pitch = (float) keyVal.Value;
+                                break;
 
-                            var mf = obj.AddComponent<MeshFilter>();
-                            var mr = obj.AddComponent<MeshRenderer>();
+                            default:
+                                if (keyVals.ContainsKey(keyVal.Key)) continue;
+                                keyVals.Add(keyVal.Key, keyVal.Value);
+                                break;
+                        }
+                    }
 
-                            mf.sharedMesh = mdl.GetMesh(0);
-                            mr.sharedMaterial = PropMaterial;
+                    var obj = new GameObject(targetName ?? className);
+                    obj.transform.SetParent(entParent.transform, true);
+
+                    angles *= Quaternion.AngleAxis(-pitch, Vector3.right);
+
+                    obj.transform.position = origin;
+                    obj.transform.rotation = angles;
+
+                    var enable = false;
+
+                    switch (className)
+                    {
+                        case "light_environment":
+                        {
+                            var light = obj.AddComponent<Light>();
+                            var color = (Color) keyVals["_light"];
+                            var ambient = (Color) keyVals["_ambient"];
+
+                            var pow = ambient.a;
+
+                            ambient = new Color(Mathf.Pow(ambient.r, pow), Mathf.Pow(ambient.g, pow), Mathf.Pow(ambient.b, pow));
+
+                            light.color = color;
+                            light.intensity = 1f;
+                            light.shadows = LightShadows.Soft;
+                            light.type = LightType.Directional;
+
+                            const float colorPow = 2.2f;
+                            const float colorScale = 0.5f;
+
+                            RenderSettings.ambientLight = new Color(
+                                Mathf.Pow(ambient.r, colorPow) * colorScale,
+                                Mathf.Pow(ambient.g, colorPow) * colorScale,
+                                Mathf.Pow(ambient.b, colorPow) * colorScale);
+                            DynamicGI.UpdateEnvironment();
+
+                            WorldMaterial.SetColor("_AmbientColor", ambient);
+                            enable = true;
+                            break;
+                        }
+                        //case "light":
+                        //{
+                        //    var light = obj.AddComponent<Light>();
+                        //    var color = (Color) keyVals["_light"];
+
+                        //    light.color = color;
+                        //    light.intensity = 1f;
+                        //    light.bounceIntensity = 0f;
+                        //    light.range = Mathf.Sqrt(color.a) * 255f * VBspFile.SourceToUnityUnits * 8f;
+
+                        //    enable = true;
+                        //    break;
+                        //}
+                        case "prop_static":
+                        {
+                            var prop = obj.AddComponent<PropStatic>();
+
+                            prop.Renderer.sharedMaterial = PropMaterial;
+                            prop.SetModel((string) keyVals["model"]);
 
                             enable = true;
-                        }
-                        catch (FileNotFoundException e)
-                        {
-                            Debug.LogWarningFormat("Unable to load model '{0}'", modelName);
-                        }
 
-                        break;
+                            break;
+                        }
                     }
+
+                    obj.SetActive(enable);
                 }
-                
-                obj.SetActive(enable);
             }
 
             Profiler.Print();

@@ -37,7 +37,7 @@ namespace VBspViewer.Importing
                 if (_providers[i].ContainsFile(filename)) return _providers[i].OpenFile(filename);
             }
 
-            throw new FileNotFoundException();
+            return _providers[0].OpenFile(filename);
         }
 
         private readonly Dictionary<string, MdlFile> _sLoadedMdls
