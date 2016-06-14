@@ -20,7 +20,7 @@ namespace VBspViewer.Behaviours
         public void SetModel(string mdlPath)
         {
             if (StringComparer.InvariantCultureIgnoreCase.Equals(mdlPath, _curModel)) return;
-            _curModel = mdlPath;
+            _curModel = Model = mdlPath;
 
             if (string.IsNullOrEmpty(mdlPath))
             {

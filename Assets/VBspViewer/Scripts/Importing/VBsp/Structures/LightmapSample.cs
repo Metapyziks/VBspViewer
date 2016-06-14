@@ -9,7 +9,7 @@ namespace VBspViewer.Importing.VBsp.Structures
     {
         public static implicit operator Color(LightmapSample sample)
         {
-            var mul = (float) Math.Pow(2d, sample.Exponent) / 255f;
+            var mul = (float) Math.Pow(2d, sample.Exponent) / 511f;
             return new Color(
                 Mathf.Clamp(Mathf.Pow(mul * sample.R, 0.6f), 0f, 1f),
                 Mathf.Clamp(Mathf.Pow(mul * sample.G, 0.6f), 0f, 1f),
