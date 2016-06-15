@@ -146,4 +146,4 @@ Material:
       data:
         first:
           name: _AmbientColor
-        second: {r: 0.7694221, g: 0.83362776, b: 0.930266, a: 1}
+        second: {r: 0.74901277, g: 0.8182137, b: 0.92339474, a: 1}

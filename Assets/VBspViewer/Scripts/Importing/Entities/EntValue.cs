@@ -313,7 +313,7 @@ namespace VBspViewer.Importing.Entities
 
         protected override Quaternion ToQuaternion()
         {
-            return Quaternion.Euler(new Vector3(Value.x, 90f - Value.z, Value.y));
+            return Quaternion.Euler(new Vector3(Value.x, 90f - Value.z, -Value.y));
         }
     }
 

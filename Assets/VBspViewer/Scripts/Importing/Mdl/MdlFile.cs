@@ -49,6 +49,14 @@ namespace VBspViewer.Importing.Mdl
         }
 
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct VertexFixup
+        {
+            public int Lod;
+            public int SourceVertexId;
+            public int NumVertices;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
         private struct StudioVertex
         {
             public StudioBoneWeight BoneWeights;
@@ -178,10 +186,10 @@ namespace VBspViewer.Importing.Mdl
             _baseFilename = filename.Substring(0, filename.Length - ".mdl".Length);
         }
 
-        private StudioVertex[] _vertices;
-        private StudioVertex[] GetVertices()
+        private StudioVertex[][] _vertices;
+        private StudioVertex[] GetVertices(int lod)
         {
-            if (_vertices != null) return _vertices;
+            if (_vertices != null) return _vertices[lod];
 
             var filePath = _baseFilename + ".vvd";
 
@@ -209,15 +217,45 @@ namespace VBspViewer.Importing.Mdl
                 var vertexDataStart = reader.ReadInt32();
                 var tangentDataStart = reader.ReadInt32();
 
-                reader.BaseStream.Seek(vertexDataStart, SeekOrigin.Begin);
-
+                var fixupList = new List<VertexFixup>();
                 var vertList = new List<StudioVertex>();
 
+                if (numFixups > 0)
+                {
+                    reader.BaseStream.Seek(fixupTableStart, SeekOrigin.Begin);
+                    ReadLumpWrapper<VertexFixup>.ReadLumpFromStream(reader.BaseStream, numFixups, fixupList);
+                }
+
+                reader.BaseStream.Seek(vertexDataStart, SeekOrigin.Begin);
                 ReadLumpWrapper<StudioVertex>.ReadLumpFromStream(reader.BaseStream, (tangentDataStart - vertexDataStart)/Marshal.SizeOf(typeof(StudioVertex)), vertList);
-                _vertices = vertList.ToArray();
+
+                _vertices = new StudioVertex[numLods][];
+
+                var lodVerts = new List<StudioVertex>();
+
+                for (var i = 0; i < numLods; ++i)
+                {
+                    if (numFixups == 0)
+                    {
+                        _vertices[i] = vertList.Take(numLodVerts[i]).ToArray();
+                        continue;
+                    }
+
+                    lodVerts.Clear();
+
+                    foreach (var vertexFixup in fixupList)
+                    {
+                        if (vertexFixup.Lod >= i)
+                        {
+                            lodVerts.AddRange(vertList.Skip(vertexFixup.SourceVertexId).Take(vertexFixup.NumVertices));
+                        }
+                    }
+
+                    _vertices[i] = lodVerts.ToArray();
+                }
             }
 
-            return _vertices;
+            return _vertices[lod];
         }
 
         private int[][] GetTriangles(int lodLevel = 0)
@@ -329,7 +367,7 @@ namespace VBspViewer.Importing.Mdl
             
             using (Profiler.Begin("BuildPropMesh"))
             { 
-                var verts = GetVertices();
+                var verts = GetVertices(lodLevel);
                 var indices = GetTriangles(lodLevel);
                 
                 if (_sVertices == null) _sVertices = new List<Vector3>();
