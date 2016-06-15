@@ -32,7 +32,6 @@ namespace VBspViewer.Behaviours
         public Texture2D Lightmap;
 
         private VBspFile _bspFile;
-        private PakFile _pakFile;
 
         [UsedImplicitly]
         private void Start()
@@ -48,9 +47,8 @@ namespace VBspViewer.Behaviours
             {
                 _bspFile = new VBspFile(stream);
             }
-
-            _pakFile = _bspFile.GetPakFile();
-            Resources.AddResourceProvider(_pakFile);
+            
+            Resources.AddResourceProvider(_bspFile.PakFile);
 
             Lightmap = _bspFile.GenerateLightmap();
             var meshes = _bspFile.GenerateMeshes();
@@ -68,6 +66,7 @@ namespace VBspViewer.Behaviours
 
                 modelChild.GetComponent<MeshFilter>().sharedMesh = mesh;
                 modelChild.GetComponent<MeshRenderer>().sharedMaterial = WorldMaterial;
+                modelChild.isStatic = true;
             }
 
             var entParent = new GameObject("Entities");
@@ -141,8 +140,8 @@ namespace VBspViewer.Behaviours
                             light.shadows = LightShadows.Soft;
                             light.type = LightType.Directional;
 
-                            const float colorPow = 2.2f;
-                            const float colorScale = 0.5f;
+                            const float colorPow = 1f;
+                            const float colorScale = 0.75f;
 
                             RenderSettings.ambientLight = new Color(
                                 Mathf.Pow(ambient.r, colorPow) * colorScale,
@@ -173,9 +172,11 @@ namespace VBspViewer.Behaviours
 
                             prop.Renderer.sharedMaterial = PropMaterial;
                             prop.Unknown = (string) keyVals["unknown"];
+                            prop.VertexLighting = (string) keyVals["vlighting"];
                             prop.SetFlags((int) keyVals["flags"]);
                             prop.SetModel((string) keyVals["model"]);
 
+                            obj.isStatic = true;
                             enable = true;
 
                             break;
@@ -192,7 +193,7 @@ namespace VBspViewer.Behaviours
         [UsedImplicitly]
         private void OnDestroy()
         {
-            Resources.RemoveResourceProvider(_pakFile);
+            Resources.RemoveResourceProvider(_bspFile.PakFile);
         }
     }
 }

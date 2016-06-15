@@ -70,6 +70,8 @@ namespace VBspViewer.Importing.VBsp
                     }
                 }
             }
+
+            PakFile = new PakFile(PakFileData);
         }
         
         [Lump(Type = LumpType.LUMP_VERTEXES)]
@@ -142,10 +144,7 @@ namespace VBspViewer.Importing.VBsp
         
         private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>();
 
-        public PakFile GetPakFile()
-        {
-            return new PakFile(PakFileData);
-        }
+        public PakFile PakFile { get; private set; }
 
         public Texture2D GenerateLightmap()
         {
@@ -422,12 +421,13 @@ namespace VBspViewer.Importing.VBsp
         }
 
         private static IEnumerable<KeyValuePair<string, EntValue>> GetStaticPropKeyVals(StaticPropV10 prop,
-            string modelName)
+            string modelName, string vertexLighting)
         {
             yield return new KeyValuePair<string, EntValue>("classname", "prop_static");
             yield return new KeyValuePair<string, EntValue>("origin", prop.Origin);
             yield return new KeyValuePair<string, EntValue>("angles", prop.Angles);
             yield return new KeyValuePair<string, EntValue>("model", modelName);
+            yield return new KeyValuePair<string, EntValue>("vlighting", vertexLighting);
             yield return new KeyValuePair<string, EntValue>("skin", prop.Skin);
             yield return new KeyValuePair<string, EntValue>("solid", prop.Solid);
             yield return new KeyValuePair<string, EntValue>("flags", (int) prop.Flag);
@@ -482,11 +482,19 @@ namespace VBspViewer.Importing.VBsp
             var props = ReadLumpWrapper<StaticPropV10>.ReadLump(propLump.Contents, readOffset,
                 propCount*Marshal.SizeOf(typeof (StaticPropV10)));
 
+            var index = 0;
             foreach (var prop in props)
             {
                 var modelName = modelNames[prop.PropType];
-                yield return GetStaticPropKeyVals(prop, modelName);
+                var hdrLighting = string.Format("sp_hdr_{0}.vhv", index);
+                var ldrLighting = string.Format("sp_{0}.vhv", index);
 
+                var lightingFile = PakFile.ContainsFile(hdrLighting) ? hdrLighting
+                    : PakFile.ContainsFile(ldrLighting) ? ldrLighting : null;
+
+                yield return GetStaticPropKeyVals(prop, modelName, lightingFile);
+
+                ++index;
             }
         }
     }

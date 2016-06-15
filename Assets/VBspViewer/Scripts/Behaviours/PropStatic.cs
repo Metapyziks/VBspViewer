@@ -18,6 +18,7 @@ namespace VBspViewer.Behaviours
         public MeshRenderer Renderer { get { return _renderer; } }
 
         public string Model;
+        public string VertexLighting;
         public string Unknown;
         public List<string> Flags;
 
@@ -36,7 +37,7 @@ namespace VBspViewer.Behaviours
             {
                 var mdl = Map.Resources.LoadMdl(mdlPath);
 
-                _meshFilter.sharedMesh = mdl.GetMesh(0);
+                _meshFilter.sharedMesh = mdl.GetMesh(0, VertexLighting);
                 _renderer.sharedMaterials = Enumerable.Repeat(_renderer.sharedMaterial, _meshFilter.sharedMesh.subMeshCount).ToArray();
             }
             catch (Exception e)

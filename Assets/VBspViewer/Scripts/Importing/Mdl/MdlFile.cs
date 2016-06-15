@@ -28,18 +28,18 @@ namespace VBspViewer.Importing.Mdl
         [ThreadStatic]
         private static List<Vector3> _sNormals;
 
-        public Mesh GetMesh(int lodLevel)
+        private Mesh GetBaseMesh(int lodLevel)
         {
             Mesh mesh;
             if (_lods.TryGetValue(lodLevel, out mesh)) return mesh;
 
             mesh = new Mesh();
-            
+
             using (Profiler.Begin("BuildPropMesh"))
-            { 
+            {
                 var verts = GetVertices(lodLevel);
                 var indices = GetTriangles(lodLevel);
-                
+
                 if (_sVertices == null) _sVertices = new List<Vector3>();
                 else _sVertices.Clear();
 
@@ -50,8 +50,8 @@ namespace VBspViewer.Importing.Mdl
 
                 for (var i = 0; i < verts.Length; ++i)
                 {
-                    _sVertices.Add(transform*((Vector3) verts[i].Position*VBspFile.SourceToUnityUnits));
-                    _sNormals.Add(transform*(Vector3) verts[i].Normal);
+                    _sVertices.Add(transform * ((Vector3) verts[i].Position * VBspFile.SourceToUnityUnits));
+                    _sNormals.Add(transform * (Vector3) verts[i].Normal);
                 }
 
                 mesh.SetVertices(_sVertices);
@@ -67,6 +67,17 @@ namespace VBspViewer.Importing.Mdl
                 _lods.Add(lodLevel, mesh);
                 return mesh;
             }
+        }
+
+        public Mesh GetMesh(int lodLevel, string vertexLightingFile)
+        {
+            var mesh = GetBaseMesh(lodLevel);
+            if (string.IsNullOrEmpty(vertexLightingFile)) return mesh;
+
+            mesh = UnityEngine.Object.Instantiate(mesh);
+            mesh.colors = GetVertexLighting(vertexLightingFile, lodLevel);
+
+            return mesh;
         }
     }
 }

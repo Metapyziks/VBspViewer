@@ -96,11 +96,22 @@ namespace VBspViewer.Importing.Mdl
             public sbyte BoneId2;
         }
 
-        private int[][] GetTriangles(int lodLevel = 0)
-        {
-            var filePath = _baseFilename + ".dx90.vtx";
+        private readonly int[][][] _triangles = new int[8][][];
+        private readonly int[][][] _vertIndexMap = new int[8][][];
 
+        private int[][] GetVertIndexMap(int lodLevel)
+        {
+            if (_vertIndexMap[lodLevel] == null) GetTriangles(lodLevel);
+            return _vertIndexMap[lodLevel];
+        }
+
+        private int[][] GetTriangles(int lodLevel)
+        {
+            if (_triangles[lodLevel] != null) return _triangles[lodLevel];
+
+            var filePath = _baseFilename + ".dx90.vtx";
             var outIndices = new List<List<int>>();
+            var outIndexMap = new List<int[]>();
 
             using (var stream = _loader.OpenFile(filePath))
             using (var reader = new BinaryReader(stream))
@@ -123,7 +134,10 @@ namespace VBspViewer.Importing.Mdl
                 var bodyPartOffset = reader.ReadInt32();
 
                 var verts = new List<OptimizedVertex>();
+                var indexMap = new List<int>();
                 var indices = new List<ushort>();
+
+                var meshIndex = 0;
 
                 reader.BaseStream.Seek(bodyPartOffset, SeekOrigin.Begin);
                 ReadLumpWrapper<BodyPartHeader>.ReadLumpFromStream(reader.BaseStream, numBodyParts, bodyPart =>
@@ -138,7 +152,6 @@ namespace VBspViewer.Importing.Mdl
                         {
                             if (lodIndex++ != lodLevel) return;
 
-                            var meshIndex = 0;
                             var skip = 0;
 
                             reader.BaseStream.Seek(lod.MeshOffset, SeekOrigin.Current);
@@ -147,6 +160,10 @@ namespace VBspViewer.Importing.Mdl
                                 List<int> meshIndices;
                                 if (outIndices.Count <= meshIndex) outIndices.Add(meshIndices = new List<int>());
                                 else meshIndices = outIndices[meshIndex];
+
+                                Debug.Assert(mesh.NumStripGroups == 1);
+
+                                indexMap.Clear();
 
                                 reader.BaseStream.Seek(mesh.StripGroupHeaderOffset, SeekOrigin.Current);
                                 ReadLumpWrapper<StripGroupHeader>.ReadLumpFromStream(reader.BaseStream, mesh.NumStripGroups, stripGroup =>
@@ -162,6 +179,11 @@ namespace VBspViewer.Importing.Mdl
                                     reader.BaseStream.Seek(start + stripGroup.IndexOffset, SeekOrigin.Begin);
                                     ReadLumpWrapper<ushort>.ReadLumpFromStream(reader.BaseStream,
                                         stripGroup.NumIndices, indices);
+
+                                    for (var i = 0; i < verts.Count; ++i)
+                                    {
+                                        indexMap.Add(verts[i].OrigMeshVertId + skip);
+                                    }
 
                                     reader.BaseStream.Seek(start + stripGroup.StripOffset, SeekOrigin.Begin);
                                     ReadLumpWrapper<StripHeader>.ReadLumpFromStream(reader.BaseStream, stripGroup.NumStrips, strip =>
@@ -181,6 +203,8 @@ namespace VBspViewer.Importing.Mdl
                                     skip += verts.Max(x => x.OrigMeshVertId) + 1;
                                 });
 
+                                outIndexMap.Add(indexMap.ToArray());
+
                                 meshIndex += 1;
                             });
                         });
@@ -188,7 +212,8 @@ namespace VBspViewer.Importing.Mdl
                 });
             }
 
-            return outIndices.Select(x => x.ToArray()).ToArray();
+            _vertIndexMap[lodLevel] = outIndexMap.ToArray();
+            return _triangles[lodLevel] = outIndices.Select(x => x.ToArray()).ToArray();
         }
     }
 }
