@@ -481,22 +481,13 @@ namespace VBspViewer.Importing.VBsp
 
             var props = ReadLumpWrapper<StaticPropV10>.ReadLump(propLump.Contents, readOffset,
                 propCount*Marshal.SizeOf(typeof (StaticPropV10)));
-            
-            var probsWithCollision = props.Count(x => x.Solid);
-            Debug.Log("Props with collision info: " + probsWithCollision.ToString());
-
-            var textfile = File.CreateText("probstuff.txt");
 
             foreach (var prop in props)
             {
                 var modelName = modelNames[prop.PropType];
-
-                textfile.WriteLine("{0}: {1}, {2}, {3}", modelName, prop.Unknown0, prop.Unknown1, prop.Unknown2);
-
                 yield return GetStaticPropKeyVals(prop, modelName);
 
             }
-            textfile.Close();
         }
     }
 }
