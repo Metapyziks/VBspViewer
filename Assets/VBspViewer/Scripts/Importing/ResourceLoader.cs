@@ -20,6 +20,11 @@ namespace VBspViewer.Importing
             _providers.Add(provider);
         }
 
+        public void RemoveResourceProvider(IResourceProvider provider)
+        {
+            _providers.Remove(provider);
+        }
+
         public bool ContainsFile(string filename)
         {
             for (var i = _providers.Count - 1; i >= 0; --i)

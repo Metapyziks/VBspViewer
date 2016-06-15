@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using Assets.VBspViewer.Scripts.Importing.VBsp;
 using UnityEngine;
 using VBspViewer.Importing.Entities;
 using VBspViewer.Importing.VBsp.Structures;
@@ -134,9 +135,17 @@ namespace VBspViewer.Importing.VBsp
         [Lump(Type = LumpType.LUMP_PHYSCOLLIDE)]
         private byte[] PhysCollisionData { get; set; }
 
+        [Lump(Type = LumpType.LUMP_PAKFILE)]
+        private byte[] PakFileData { get; set; }
+
         private GameLumpInfo[] GameLumps { get; set; }
         
-        private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>(); 
+        private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>();
+
+        public PakFile GetPakFile()
+        {
+            return new PakFile(PakFileData);
+        }
 
         public Texture2D GenerateLightmap()
         {
@@ -421,7 +430,8 @@ namespace VBspViewer.Importing.VBsp
             yield return new KeyValuePair<string, EntValue>("model", modelName);
             yield return new KeyValuePair<string, EntValue>("skin", prop.Skin);
             yield return new KeyValuePair<string, EntValue>("solid", prop.Solid);
-            yield return new KeyValuePair<string, EntValue>("flags", prop.Flags);
+            yield return new KeyValuePair<string, EntValue>("flags", (int) prop.Flag);
+            yield return new KeyValuePair<string, EntValue>("unknown", string.Format("{0:x2}, {1:x4}, {2:x8}", prop.Unknown0, prop.Unknown1, prop.Unknown2));
         } 
 
         public IEnumerable<IEnumerable<KeyValuePair<string, EntValue>>> GetEntityKeyVals()
@@ -471,8 +481,7 @@ namespace VBspViewer.Importing.VBsp
 
             var props = ReadLumpWrapper<StaticPropV10>.ReadLump(propLump.Contents, readOffset,
                 propCount*Marshal.SizeOf(typeof (StaticPropV10)));
-
-
+            
             var probsWithCollision = props.Count(x => x.Solid);
             Debug.Log("Props with collision info: " + probsWithCollision.ToString());
 

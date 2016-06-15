@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
+using Assets.VBspViewer.Scripts.Importing.VBsp;
 using JetBrains.Annotations;
 using VBspViewer.Importing;
 using VBspViewer.Importing.VBsp;
@@ -31,6 +32,7 @@ namespace VBspViewer.Behaviours
         public Texture2D Lightmap;
 
         private VBspFile _bspFile;
+        private PakFile _pakFile;
 
         [UsedImplicitly]
         private void Start()
@@ -46,6 +48,9 @@ namespace VBspViewer.Behaviours
             {
                 _bspFile = new VBspFile(stream);
             }
+
+            _pakFile = _bspFile.GetPakFile();
+            Resources.AddResourceProvider(_pakFile);
 
             Lightmap = _bspFile.GenerateLightmap();
             var meshes = _bspFile.GenerateMeshes();
@@ -167,6 +172,8 @@ namespace VBspViewer.Behaviours
                             var prop = obj.AddComponent<PropStatic>();
 
                             prop.Renderer.sharedMaterial = PropMaterial;
+                            prop.Unknown = (string) keyVals["unknown"];
+                            prop.SetFlags((int) keyVals["flags"]);
                             prop.SetModel((string) keyVals["model"]);
 
                             enable = true;
@@ -180,6 +187,12 @@ namespace VBspViewer.Behaviours
             }
 
             Profiler.Print();
+        }
+
+        [UsedImplicitly]
+        private void OnDestroy()
+        {
+            Resources.RemoveResourceProvider(_pakFile);
         }
     }
 }

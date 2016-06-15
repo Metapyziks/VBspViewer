@@ -1,7 +1,21 @@
-﻿using System.Runtime.InteropServices;
+﻿using System;
+using System.Runtime.InteropServices;
 
 namespace VBspViewer.Importing.VBsp.Structures
 {
+    [Flags]
+    public enum StaticPropFlag : byte
+    {
+        Fades = 1,
+        UseLightingOrigin = 2,
+        NoDraw = 4,
+        IgnoreNormals = 8,
+        NoShadow = 0x10,
+        Unused = 0x20,
+        NoPerVertexLighting = 0x40,
+        NoSelfShadowing = 0x80
+    }
+
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct StaticPropV10
     {
@@ -11,7 +25,7 @@ namespace VBspViewer.Importing.VBsp.Structures
         public ushort FirstLeaf;
         public ushort LeafCount;
         [MarshalAs(UnmanagedType.U1)] public bool Solid;
-        public byte Flags;
+        public StaticPropFlag Flag;
         public int Skin;
         public float FadeMinDist;
         public float FadeMaxDist;

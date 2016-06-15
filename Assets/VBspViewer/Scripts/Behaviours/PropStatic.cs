@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using JetBrains.Annotations;
+using VBspViewer.Importing.VBsp.Structures;
 
 namespace VBspViewer.Behaviours
 {
@@ -16,6 +18,8 @@ namespace VBspViewer.Behaviours
         public MeshRenderer Renderer { get { return _renderer; } }
 
         public string Model;
+        public string Unknown;
+        public List<string> Flags;
 
         public void SetModel(string mdlPath)
         {
@@ -39,6 +43,19 @@ namespace VBspViewer.Behaviours
             {
                 Debug.LogException(e);
                 _meshFilter.sharedMesh = null;
+            }
+        }
+
+        public void SetFlags(int flags)
+        {
+            if (Flags == null) Flags = new List<string>();
+            else Flags.Clear();
+
+            foreach (var flag in Enum.GetValues(typeof(StaticPropFlag)).Cast<StaticPropFlag>())
+            {
+                if (((StaticPropFlag) flags & flag) != flag) continue;
+
+                Flags.Add(flag.ToString());
             }
         }
 
