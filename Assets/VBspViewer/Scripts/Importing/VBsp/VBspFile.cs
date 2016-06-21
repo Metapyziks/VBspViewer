@@ -344,7 +344,7 @@ namespace VBspViewer.Importing.VBsp
                         meshGen.AddVertex((Vector3) vert * SourceToUnityUnits, plane.Normal, lightmapUv);
                     }
 
-                    if (face.NumPrimitives == 0)
+                    if (face.NumPrimitives == 0 || face.NumPrimitives >= 0x8000)
                     {
                         meshGen.AddPrimitive(PrimitiveType.TriangleStrip);
                         meshGen.EndFace();
