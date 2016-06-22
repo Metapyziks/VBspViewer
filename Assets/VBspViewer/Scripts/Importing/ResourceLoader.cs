@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using VBspViewer.Importing.Mdl;
+using VBspViewer.Importing.Vmt;
 
 namespace VBspViewer.Importing
 {
@@ -55,6 +56,23 @@ namespace VBspViewer.Importing
 
             loaded = new MdlFile(this, filename);
             _sLoadedMdls.Add(filename, loaded);
+
+            return loaded;
+        }
+
+        private readonly Dictionary<string, VmtFile> _sLoadedVmts
+            = new Dictionary<string, VmtFile>(StringComparer.CurrentCultureIgnoreCase);
+
+        public VmtFile LoadVmt(string filename)
+        {
+            VmtFile loaded;
+            if (_sLoadedVmts.TryGetValue(filename, out loaded)) return loaded;
+
+            using (var stream = OpenFile(filename))
+            {
+                loaded = VmtFile.FromStream(stream);
+                _sLoadedVmts.Add(filename, loaded);
+            }
 
             return loaded;
         }

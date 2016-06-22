@@ -51,26 +51,8 @@ namespace VBspViewer.Behaviours
             Resources.AddResourceProvider(_bspFile.PakFile);
 
             Lightmap = _bspFile.GenerateLightmap();
-            var meshes = _bspFile.GenerateMeshes(0);
 
             WorldMaterial.SetTexture("_LightMap", Lightmap);
-
-            var geomParent = new GameObject("Geometry");
-            geomParent.transform.SetParent(transform, true);
-
-            var index = 0;
-            foreach (var mesh in meshes)
-            {
-                var modelChild = new GameObject("Model " + index++, typeof(MeshFilter), typeof(MeshRenderer));
-                modelChild.transform.SetParent(geomParent.transform, true);
-
-                modelChild.GetComponent<MeshFilter>().sharedMesh = mesh;
-                modelChild.GetComponent<MeshRenderer>().sharedMaterial = WorldMaterial;
-                modelChild.isStatic = true;
-            }
-
-            var entParent = new GameObject("Entities");
-            entParent.transform.SetParent(transform, true);
 
             var keyVals = new Dictionary<string, EntValue>();
 
@@ -80,9 +62,11 @@ namespace VBspViewer.Behaviours
                 {
                     string className = null;
                     string targetName = null;
+                    string modelName = null;
                     var origin = Vector3.zero;
                     var angles = Quaternion.identity;
                     var pitch = 0f;
+                    var modelIndex = -1;
 
                     keyVals.Clear();
 
@@ -105,7 +89,10 @@ namespace VBspViewer.Behaviours
                             case "pitch":
                                 pitch = (float) keyVal.Value;
                                 break;
-
+                            case "model":
+                                modelName = (string) keyVal.Value;
+                                if (modelName.StartsWith("*")) modelIndex = int.Parse(modelName.Substring(1));
+                                break;
                             default:
                                 if (keyVals.ContainsKey(keyVal.Key)) continue;
                                 keyVals.Add(keyVal.Key, keyVal.Value);
@@ -114,24 +101,32 @@ namespace VBspViewer.Behaviours
                     }
 
                     var obj = new GameObject(targetName ?? className);
-                    obj.transform.SetParent(entParent.transform, true);
+                    obj.transform.SetParent(transform, true);
 
                     angles *= Quaternion.AngleAxis(-pitch, Vector3.right);
 
                     obj.transform.position = origin;
                     obj.transform.rotation = angles;
-
+                    
                     var enable = false;
 
                     switch (className)
                     {
+                        case "worldspawn":
+                        {
+                            modelIndex = 0;
+                            enable = true;
+                            obj.isStatic = true;
+
+                            break;
+                        }
                         case "light_environment":
                         {
                             var light = obj.AddComponent<Light>();
                             var color = (Color) keyVals["_light"];
                             var ambient = (Color) keyVals["_ambient"];
 
-                            var pow = 0.5f;
+                            var pow = 0.25f;
 
                             ambient = new Color(Mathf.Pow(ambient.r, pow), Mathf.Pow(ambient.g, pow), Mathf.Pow(ambient.b, pow));
 
@@ -168,13 +163,31 @@ namespace VBspViewer.Behaviours
                             prop.Unknown = (string) keyVals["unknown"];
                             prop.VertexLighting = (string) keyVals["vlighting"];
                             prop.SetFlags((int) keyVals["flags"]);
-                            prop.SetModel((string) keyVals["model"]);
+                            prop.SetModel(modelName);
 
                             obj.isStatic = true;
                             enable = true;
 
                             break;
                         }
+                    }
+
+                    if (modelIndex >= 0)
+                    {
+                        var meshes = _bspFile.GenerateMeshes(modelIndex);
+                        foreach (var mesh in meshes)
+                        {
+                            if (mesh.vertexCount == 0) continue;
+
+                            var modelChild = new GameObject("faces", typeof(MeshFilter), typeof(MeshRenderer));
+                            modelChild.transform.SetParent(obj.transform, false);
+
+                            modelChild.GetComponent<MeshFilter>().sharedMesh = mesh;
+                            modelChild.GetComponent<MeshRenderer>().sharedMaterial = WorldMaterial;
+                            modelChild.isStatic = modelIndex == 0;
+                        }
+
+                        enable = true;
                     }
 
                     obj.SetActive(enable);

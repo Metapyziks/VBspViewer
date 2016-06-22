@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using UnityEngine;
 using VBspViewer.Importing.VBsp;
 
@@ -9,6 +10,13 @@ namespace VBspViewer.Importing.Mdl
 {
     public partial class MdlFile
     {
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct MaterialReplacementHeader
+        {
+            public short MaterialId;
+            public int ReplacementMaterialNameOffset;
+        }
+
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         private struct MaterialReplacementListHeader
         {
@@ -98,11 +106,18 @@ namespace VBspViewer.Importing.Mdl
 
         private readonly int[][][] _triangles = new int[8][][];
         private readonly int[][][] _vertIndexMap = new int[8][][];
+        private readonly string[][] _materials = new string[8][];
 
         private int[][] GetVertIndexMap(int lodLevel)
         {
             if (_vertIndexMap[lodLevel] == null) GetTriangles(lodLevel);
             return _vertIndexMap[lodLevel];
+        }
+
+        private string[] GetMaterials(int lodLevel)
+        {
+            if (_materials[lodLevel] == null) GetTriangles(lodLevel);
+            return _materials[lodLevel];
         }
 
         private int[][] GetTriangles(int lodLevel)
@@ -133,6 +148,32 @@ namespace VBspViewer.Importing.Mdl
                 var numBodyParts = reader.ReadInt32();
                 var bodyPartOffset = reader.ReadInt32();
 
+                var lodIndex = 0;
+
+                //var materialNameBuilder = new StringBuilder();
+
+                //reader.BaseStream.Seek(matReplacementListOffset, SeekOrigin.Begin);
+                //ReadLumpWrapper<MaterialReplacementListHeader>.ReadLumpFromStream(reader.BaseStream, numLods, materialList =>
+                //{
+                //    if (lodIndex++ != lodLevel) return;
+
+                //    reader.BaseStream.Seek(materialList.ReplacementOffset, SeekOrigin.Current);
+                //    ReadLumpWrapper<MaterialReplacementHeader>.ReadLumpFromStream(reader.BaseStream, numLods, material =>
+                //    {
+                //        if (material.ReplacementMaterialNameOffset == 0 || material.ReplacementMaterialNameOffset == 0xffff) return;
+
+                //        materialNameBuilder.Remove(0, materialNameBuilder.Length);
+
+                //        char ch;
+
+                //        reader.BaseStream.Seek(material.ReplacementMaterialNameOffset, SeekOrigin.Current);
+                //        while ((ch = reader.ReadChar()) != '\0') materialNameBuilder.Append(ch);
+
+                //        var materialName = materialNameBuilder.ToString();
+                //        Debug.Log(materialName);
+                //    });
+                //});
+
                 var verts = new List<OptimizedVertex>();
                 var indexMap = new List<int>();
                 var indices = new List<ushort>();
@@ -147,7 +188,7 @@ namespace VBspViewer.Importing.Mdl
                     {
                         reader.BaseStream.Seek(model.LodOffset, SeekOrigin.Current);
 
-                        var lodIndex = 0;
+                        lodIndex = 0;
                         ReadLumpWrapper<ModelLodHeader>.ReadLumpFromStream(reader.BaseStream, model.NumLods, lod =>
                         {
                             if (lodIndex++ != lodLevel) return;

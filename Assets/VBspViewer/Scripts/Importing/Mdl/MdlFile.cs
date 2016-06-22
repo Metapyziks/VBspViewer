@@ -23,10 +23,9 @@ namespace VBspViewer.Importing.Mdl
             _baseFilename = filename.Substring(0, filename.Length - ".mdl".Length);
         }
 
-        [ThreadStatic]
-        private static List<Vector3> _sVertices;
-        [ThreadStatic]
-        private static List<Vector3> _sNormals;
+        [ThreadStatic] private static List<Vector3> _sVertices;
+        [ThreadStatic] private static List<Vector3> _sNormals;
+        [ThreadStatic] private static List<Vector2> _sTexCoords; 
 
         private Mesh GetBaseMesh(int lodLevel)
         {
@@ -46,16 +45,23 @@ namespace VBspViewer.Importing.Mdl
                 if (_sNormals == null) _sNormals = new List<Vector3>();
                 else _sNormals.Clear();
 
+                if (_sTexCoords == null) _sTexCoords = new List<Vector2>();
+                else _sTexCoords.Clear();
+
                 var transform = Matrix4x4.TRS(Vector3.zero, Quaternion.AngleAxis(-90f, Vector3.up), Vector3.one);
 
                 for (var i = 0; i < verts.Length; ++i)
                 {
-                    _sVertices.Add(transform * ((Vector3) verts[i].Position * VBspFile.SourceToUnityUnits));
-                    _sNormals.Add(transform * (Vector3) verts[i].Normal);
+                    var vert = verts[i];
+
+                    _sVertices.Add(transform * ((Vector3) vert.Position * VBspFile.SourceToUnityUnits));
+                    _sNormals.Add(transform * (Vector3) vert.Normal);
+                    _sTexCoords.Add(new Vector2(vert.TexCoordX, vert.TexCoordY));
                 }
 
                 mesh.SetVertices(_sVertices);
                 mesh.SetNormals(_sNormals);
+                mesh.SetUVs(0, _sTexCoords);
 
                 mesh.subMeshCount = indices.Length;
 
