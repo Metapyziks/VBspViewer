@@ -39,7 +39,7 @@
 
         void surf( Input IN, inout SurfaceOutputStandard o )
         {
-            fixed4 c = tex2D( _MainTex, IN.uv_MainTex ) * fixed4( IN.VertColor, 1 ) * _Color;
+            fixed4 c = tex2D( _MainTex, IN.uv_MainTex ) * pow( fixed4( IN.VertColor, 1 ), 1.265 ) * _Color;
             o.Albedo = c.rgb;
             o.Metallic = _Metallic;
             o.Smoothness = _Glossiness;

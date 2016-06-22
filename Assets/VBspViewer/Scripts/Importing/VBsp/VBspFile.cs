@@ -140,6 +140,9 @@ namespace VBspViewer.Importing.VBsp
         [Lump(Type = LumpType.LUMP_PAKFILE)]
         private byte[] PakFileData { get; set; }
 
+        [Lump(Type = LumpType.LUMP_MODELS)]
+        private Model[] Models { get; set; }
+
         private GameLumpInfo[] GameLumps { get; set; }
         
         private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>();
@@ -375,24 +378,24 @@ namespace VBspViewer.Importing.VBsp
             return mesh;
         }
         
-        public Mesh[] GenerateMeshes()
+        public Mesh[] GenerateMeshes(int modelNum)
         {
             var meshGen = new MeshBuilder();
             const int facesPerMesh = 1024;
+            
+            var meshes = new List<Mesh>();
+            var model = Models[modelNum];
 
-            var meshCount = (FacesHdr.Length + facesPerMesh - 1)/facesPerMesh;
-            var meshes = new Mesh[meshCount];
-
-            for (var meshIndex = 0; meshIndex < meshCount; ++meshIndex)
+            for (var faceOffset = 0; faceOffset < model.NumFaces; faceOffset += facesPerMesh)
             {
-                var firstFace = meshIndex * facesPerMesh;
-                var endFace = Math.Min(firstFace+facesPerMesh, FacesHdr.Length);
+                var count = Math.Min(faceOffset + facesPerMesh, model.NumFaces) - faceOffset;
 
                 meshGen.Clear();
-                meshes[meshIndex] = GenerateMesh(meshGen, Enumerable.Range(firstFace, endFace - firstFace));
+                meshGen.Offset = model.Origin;
+                meshes.Add(GenerateMesh(meshGen, Enumerable.Range(model.FirstFace + faceOffset, count)));
             }
 
-            return meshes;
+            return meshes.ToArray();
         }
 
         [ThreadStatic]

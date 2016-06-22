@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using VBspViewer.Importing.VBsp.Structures;
 using PrimitiveType = VBspViewer.Importing.VBsp.Structures.PrimitiveType;
 
 namespace VBspViewer.Importing.VBsp
@@ -45,6 +44,8 @@ namespace VBspViewer.Importing.VBsp
 
         private readonly List<int> _indices = new List<int>();
         private readonly List<int> _faceIndices = new List<int>();
+
+        public Vector3 Offset { get; set; }
 
         public void Clear()
         {
@@ -97,6 +98,8 @@ namespace VBspViewer.Importing.VBsp
 
         public void AddVertex(Vector3 pos, Vector3 normal, Vector2 lightmapUv)
         {
+            pos += Offset;
+
             var meshVert = new MeshVertex(pos, normal, lightmapUv);
 
             int vertIndex;

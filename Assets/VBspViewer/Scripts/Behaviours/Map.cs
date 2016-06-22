@@ -51,7 +51,7 @@ namespace VBspViewer.Behaviours
             Resources.AddResourceProvider(_bspFile.PakFile);
 
             Lightmap = _bspFile.GenerateLightmap();
-            var meshes = _bspFile.GenerateMeshes();
+            var meshes = _bspFile.GenerateMeshes(0);
 
             WorldMaterial.SetTexture("_LightMap", Lightmap);
 
@@ -131,7 +131,7 @@ namespace VBspViewer.Behaviours
                             var color = (Color) keyVals["_light"];
                             var ambient = (Color) keyVals["_ambient"];
 
-                            var pow = ambient.a;
+                            var pow = 0.5f;
 
                             ambient = new Color(Mathf.Pow(ambient.r, pow), Mathf.Pow(ambient.g, pow), Mathf.Pow(ambient.b, pow));
 
@@ -140,13 +140,7 @@ namespace VBspViewer.Behaviours
                             light.shadows = LightShadows.Soft;
                             light.type = LightType.Directional;
 
-                            const float colorPow = 1f;
-                            const float colorScale = 0.825f;
-
-                            RenderSettings.ambientLight = new Color(
-                                Mathf.Pow(ambient.r, colorPow) * colorScale,
-                                Mathf.Pow(ambient.g, colorPow) * colorScale,
-                                Mathf.Pow(ambient.b, colorPow) * colorScale);
+                            RenderSettings.ambientLight = ambient;
                             DynamicGI.UpdateEnvironment();
 
                             WorldMaterial.SetColor("_AmbientColor", ambient);
