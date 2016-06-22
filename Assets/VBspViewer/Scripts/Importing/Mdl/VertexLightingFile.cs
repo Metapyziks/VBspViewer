@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
@@ -16,11 +17,40 @@ namespace VBspViewer.Importing.Mdl
             public int VertOffset;
         }
 
+        private interface IVertexData
+        {
+            Color GetVertexColor();
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct VertexData4 : IVertexData
+        {
+            public byte B;
+            public byte G;
+            public byte R;
+            public byte A;
+
+            public Color GetVertexColor()
+            {
+                return new Color32(R, G, B, A);
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct VertexData2 : IVertexData
+        {
+            public VertexData4 Color;
+            public int Unknown1;
+            public int Unknown2;
+            
+            public Color GetVertexColor()
+            {
+                return Color.GetVertexColor();
+            }
+        }
+
         private Color[] GetVertexLighting(string filePath, int lodLevel)
         {
-            var indexMap = GetVertIndexMap(lodLevel);
-            var verts = GetVertices(lodLevel);
-
             using (var stream = _loader.OpenFile(filePath))
             using (var reader = new BinaryReader(stream))
             {
@@ -37,40 +67,50 @@ namespace VBspViewer.Importing.Mdl
                 reader.ReadInt64(); // Unused
                 reader.ReadInt64(); // Unused
 
-                var meshHeaders = new List<VhvMeshHeader>();
-                ReadLumpWrapper<VhvMeshHeader>.ReadLumpFromStream(reader.BaseStream, meshCount, meshHeaders);
-
-                var sampleList = new List<Color32>();
-                var output = new Color[verts.Length];
-
-                const float scale = 1f/255f;
-                const float exp = 1f;//1f/2.2f;
-
-                var meshIndex = 0;
-                foreach (var meshHeader in meshHeaders)
+                switch (vertFlags)
                 {
-                    if (meshHeader.Lod != lodLevel) continue;
-                    if (meshHeader.VertCount == 0) continue;
-                    if (meshIndex >= indexMap.Length) break;
+                    case 2: return ReadVertexSamples<VertexData2>(reader.BaseStream, lodLevel, meshCount);
+                    case 4: return ReadVertexSamples<VertexData4>(reader.BaseStream, lodLevel, meshCount);
+                    default: throw new NotImplementedException();
+                }
+            }
+        }
 
-                    sampleList.Clear();
+        private Color[] ReadVertexSamples<TVertex>(Stream stream, int lodLevel, int meshCount)
+            where TVertex : struct, IVertexData
+        {
+            var indexMap = GetVertIndexMap(lodLevel);
+            var verts = GetVertices(lodLevel);
 
-                    reader.BaseStream.Seek(meshHeader.VertOffset, SeekOrigin.Begin);
-                    ReadLumpWrapper<Color32>.ReadLumpFromStream(reader.BaseStream, meshHeader.VertCount, sampleList);
+            var meshHeaders = new List<VhvMeshHeader>();
+            ReadLumpWrapper<VhvMeshHeader>.ReadLumpFromStream(stream, meshCount, meshHeaders);
 
-                    var map = indexMap[meshIndex];
+            var sampleList = new List<TVertex>();
+            var output = new Color[verts.Length];
 
-                    for (var i = 0; i < sampleList.Count; ++i)
-                    {
-                        var sample = sampleList[i];
-                        output[map[i]] = new Color(Mathf.Pow(sample.b * scale, exp), Mathf.Pow(sample.g * scale, exp), Mathf.Pow(sample.r * scale, exp), 1f);
-                    }
+            var meshIndex = 0;
+            foreach (var meshHeader in meshHeaders)
+            {
+                if (meshHeader.Lod != lodLevel) continue;
+                if (meshHeader.VertCount == 0) continue;
+                if (meshIndex >= indexMap.Length) break;
 
-                    meshIndex += 1;
+                sampleList.Clear();
+
+                stream.Seek(meshHeader.VertOffset, SeekOrigin.Begin);
+                ReadLumpWrapper<TVertex>.ReadLumpFromStream(stream, meshHeader.VertCount, sampleList);
+
+                var map = indexMap[meshIndex];
+
+                for (var i = 0; i < sampleList.Count; ++i)
+                {
+                    output[map[i]] = sampleList[i].GetVertexColor();
                 }
 
-                return output;
+                meshIndex += 1;
             }
+
+            return output;
         }
     }
 }
