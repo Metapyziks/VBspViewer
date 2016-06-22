@@ -141,7 +141,7 @@ namespace VBspViewer.Behaviours
                             light.type = LightType.Directional;
 
                             const float colorPow = 1f;
-                            const float colorScale = 0.75f;
+                            const float colorScale = 0.825f;
 
                             RenderSettings.ambientLight = new Color(
                                 Mathf.Pow(ambient.r, colorPow) * colorScale,

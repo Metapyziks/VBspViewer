@@ -15,6 +15,10 @@ namespace VBspViewer.Importing.Mdl
             public int Lod;
             public int VertCount;
             public int VertOffset;
+            public int Unused0;
+            public int Unused1;
+            public int Unused2;
+            public int Unused3;
         }
 
         private interface IVertexData
@@ -40,8 +44,8 @@ namespace VBspViewer.Importing.Mdl
         private struct VertexData2 : IVertexData
         {
             public VertexData4 Color;
+            public int Unknown0;
             public int Unknown1;
-            public int Unknown2;
             
             public Color GetVertexColor()
             {
@@ -87,7 +91,7 @@ namespace VBspViewer.Importing.Mdl
 
             var sampleList = new List<TVertex>();
             var output = new Color[verts.Length];
-
+            
             var meshIndex = 0;
             foreach (var meshHeader in meshHeaders)
             {
