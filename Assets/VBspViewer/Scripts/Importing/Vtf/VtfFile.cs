@@ -118,16 +118,24 @@ namespace VBspViewer.Importing.Vtf
 
         private static int GetImageDataSize(int width, int height, int depth, int mipCount, Format format)
         {
+            var toAdd = 0;
+            if (mipCount > 1) toAdd += GetImageDataSize(width >> 1, height >> 1, depth, mipCount - 1, format);
+            
+            // TODO: move this when supporting non-DXT formats
+            if (width < 4 && width > 0) width = 4;
+            if (height < 4 && height > 0) height = 4;
+
             switch (format)
             {
-                case Format.NONE: return 0;
-                case Format.DXT1: return (width*height) >> 3;
+                case Format.NONE: return toAdd;
+                case Format.DXT1: return toAdd + ((width*height) >> 1) * depth;
+                case Format.DXT5: return toAdd + width * height*depth;
                 default: throw new NotImplementedException();
             }
         }
 
         private readonly Header _header;
-        private Texture2D _texture;
+        private readonly Texture2D _texture;
 
         private VtfFile(Stream stream)
         {
@@ -137,18 +145,26 @@ namespace VBspViewer.Importing.Vtf
 
             var thumbSize = GetImageDataSize(_header.LowResWidth, _header.LowResHeight, 1, 1, _header.LowResFormat);
 
+            Debug.Assert(_header.HiResFormat == Format.DXT5);
+
             stream.Seek(thumbSize, SeekOrigin.Current);
 
-            Debug.Log(_header.HiResFormat.ToString());
+            var bigMipSize = GetImageDataSize(_header.Width, _header.Height, 1, 1, _header.HiResFormat);
+            var offset = GetImageDataSize(_header.Width, _header.Height, 1, _header.MipMapCount, _header.HiResFormat) - bigMipSize;
+
+            stream.Seek(offset, SeekOrigin.Current);
+
+            var buffer = new byte[bigMipSize];
+            stream.Read(buffer, 0, buffer.Length);
+
+            _texture = new Texture2D(_header.Width, _header.Height, TextureFormat.DXT5, false);
+            _texture.LoadRawTextureData(buffer);
+            _texture.Apply();
         }
 
         public Texture GetTexture()
         {
-            if (_texture != null) return _texture;
-
-            _texture = new Texture2D(_header.Width, _header.Height);
-
-            throw new NotImplementedException();
+            return _texture;
         }
     }
 }

@@ -153,7 +153,7 @@ namespace VBspViewer.Importing.Vmt
 
         private static Material CreateMaterial()
         {
-            return UnityEngine.Object.Instantiate(Resources.Load<Material>("Materials/PropDefault"));
+            return new Material(Shader.Find("Custom/PropGeometryAlpha"));
         }
 
         public static VmtFile FromStream(Stream stream)
@@ -201,9 +201,10 @@ namespace VBspViewer.Importing.Vmt
             var propGroup = _propertyGroups.First();
             var alphatest = propGroup.Value.GetBoolean("$alphatest");
             var translucent = propGroup.Value.GetBoolean("$translucent");
+            var distancealpha = propGroup.Value.GetBoolean("$distancealpha");
             var basetex = propGroup.Value.GetString("$basetexture");
 
-            if (!translucent && !alphatest || basetex == null) return _material = GetDefaultMaterial();
+            if (!translucent && !alphatest && !distancealpha || basetex == null) return _material = GetDefaultMaterial();
             if (!basetex.EndsWith(".vtf")) basetex += ".vtf";
 
             basetex = basetex.Replace('\\', '/');
@@ -211,6 +212,8 @@ namespace VBspViewer.Importing.Vmt
             _material = CreateMaterial();
 
             var baseTex = loader.LoadVtf(basetex);
+
+            _material.mainTexture = baseTex.GetTexture();
 
             return _material;
         }

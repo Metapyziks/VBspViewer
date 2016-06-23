@@ -283,7 +283,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   FilePath: de_overpass.bsp
   WorldMaterial: {fileID: 2100000, guid: bc53a50f47bbfce41992abca9b6af971, type: 2}
-  PropMaterial: {fileID: 2100000, guid: 59e0132ba004c594ca0f4983cb0cb8bd, type: 2}
   Lightmap: {fileID: 0}
 --- !u!4 &1929632567
 Transform:
