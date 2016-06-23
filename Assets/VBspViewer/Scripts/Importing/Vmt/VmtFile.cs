@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
+using UnityEngine;
 
 namespace VBspViewer.Importing.Vmt
 {
@@ -16,7 +18,7 @@ namespace VBspViewer.Importing.Vmt
             var reader = new StreamReader(stream);
             var value = reader.ReadToEnd();
 
-            _lines = value.Split(new[] {"\r\n", "\n"}, StringSplitOptions.None);
+            _lines = value.Split(new[] {"\r\n", "\n"}, StringSplitOptions.None).Select(x => TrimLine(x)).ToArray();
         }
 
         public void AssertToken(string token)
@@ -29,13 +31,23 @@ namespace VBspViewer.Importing.Vmt
             if (!ReadRegex(regex, out match)) ExpectedError(token);
         }
 
+        private string TrimLine(string line)
+        {
+            line = line.Trim();
+
+            var comment = line.IndexOf("//");
+            if (comment != -1) line = line.Substring(0, comment);
+
+            return line;
+        }
+
         public bool ReadToken(string token)
         {
             var curOffset = _offset;
 
             while (curOffset < _lines.Length)
             {
-                var line = _lines[curOffset++].Trim();
+                var line = _lines[curOffset++];
                 if (string.IsNullOrEmpty(line)) continue;
 
                 if (!line.Equals(token)) return false;
@@ -54,7 +66,7 @@ namespace VBspViewer.Importing.Vmt
             match = null;
             while (curOffset < _lines.Length)
             {
-                var line = _lines[curOffset++].Trim();
+                var line = _lines[curOffset++];
                 if (string.IsNullOrEmpty(line)) continue;
 
                 match = regex.Match(line);
@@ -69,15 +81,16 @@ namespace VBspViewer.Importing.Vmt
 
         public void ExpectedError(string expected)
         {
-            throw new VmtParserException(expected, _offset);
+            throw new VmtParserException(expected, _offset, _lines[_offset]);
         }
     }
 
     public class PropertyGroup
     {
-        private static readonly Regex _sPropertyRegex = new Regex(@"^\s*((?<name>\$[a-zA-Z0-9_]+)|""(?<name>[^""]+)"")\s+((?<value>\S+)|""(?<value>[^""]+)"")\s*$", RegexOptions.Compiled);
+        private static readonly Regex _sPropertyRegex = new Regex(@"^\s*(""(?<name>[^""]+)""|(?<name>[$%a-zA-Z0-9_]+))\s+(""(?<value>[^""]+)""|(?<value>\S+))\s*$", RegexOptions.Compiled);
+        private static readonly Regex _sNestedRegex = new Regex(@"^\s*(""(?<name>[^""]+)""|(?<name>[$%a-zA-Z0-9_]+))\s*$", RegexOptions.Compiled);
 
-        private readonly Dictionary<string, string> _properties = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> _properties = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
 
         public string GetString(string name, string @default = null)
         {
@@ -106,20 +119,43 @@ namespace VBspViewer.Importing.Vmt
             while (!reader.ReadToken("}"))
             {
                 Match match;
+                if (reader.ReadRegex(_sNestedRegex, out match))
+                {
+                    // TODO
+                    var nested = new PropertyGroup(reader);
+                    continue;
+                }
+
                 reader.AssertRegex(_sPropertyRegex, out match, "shader property");
-                _properties.Add(match.Groups["name"].Value, match.Groups["value"].Value);
+
+                var name = match.Groups["name"];
+                var value = match.Groups["value"];
+
+                _properties.Add(name.Value, value.Value);
             }
         }
     }
 
     public class VmtParserException : Exception
     {
-        public VmtParserException(string expected, int line)
-            : base(string.Format("Error while parsing material: expected {0} on line {1}.", expected, line)) { }
+        public VmtParserException(string expected, int line, string lineValue)
+            : base(string.Format("Error while parsing material: expected {0} on line {1}.{2}{3}", expected, line, Environment.NewLine, lineValue)) { }
     }
 
     public class VmtFile
     {
+        private static Material _sDefaultMaterial;
+
+        private static Material GetDefaultMaterial()
+        {
+            return _sDefaultMaterial ?? (_sDefaultMaterial = CreateMaterial());
+        }
+
+        private static Material CreateMaterial()
+        {
+            return UnityEngine.Object.Instantiate(Resources.Load<Material>("Materials/PropDefault"));
+        }
+
         public static VmtFile FromStream(Stream stream)
         {
             var reader = new VmtFileReader(stream);
@@ -128,7 +164,8 @@ namespace VBspViewer.Importing.Vmt
             return file;
         }
 
-        private readonly Dictionary<string, PropertyGroup> _propertyGroups = new Dictionary<string, PropertyGroup>();
+        private readonly Dictionary<string, PropertyGroup> _propertyGroups = new Dictionary<string, PropertyGroup>(StringComparer.InvariantCultureIgnoreCase);
+        private Material _material;
 
         private VmtFile(VmtFileReader reader)
         {
@@ -154,6 +191,28 @@ namespace VBspViewer.Importing.Vmt
         public PropertyGroup this[string shader]
         {
             get { return _propertyGroups[shader]; }
+        }
+
+        public Material GetMaterial(ResourceLoader loader)
+        {
+            if (_material != null) return _material;
+            if (_propertyGroups.Count == 0) return _material = GetDefaultMaterial();
+
+            var propGroup = _propertyGroups.First();
+            var alphatest = propGroup.Value.GetBoolean("$alphatest");
+            var translucent = propGroup.Value.GetBoolean("$translucent");
+            var basetex = propGroup.Value.GetString("$basetexture");
+
+            if (!translucent && !alphatest || basetex == null) return _material = GetDefaultMaterial();
+            if (!basetex.EndsWith(".vtf")) basetex += ".vtf";
+
+            basetex = basetex.Replace('\\', '/');
+
+            _material = CreateMaterial();
+
+            var baseTex = loader.LoadVtf(basetex);
+
+            return _material;
         }
     }
 }

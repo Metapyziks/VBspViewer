@@ -27,7 +27,6 @@ namespace VBspViewer.Behaviours
 
         public string FilePath;
         public Material WorldMaterial;
-        public Material PropMaterial;
 
         public Texture2D Lightmap;
 
@@ -158,8 +157,7 @@ namespace VBspViewer.Behaviours
                         case "prop_static":
                         {
                             var prop = obj.AddComponent<PropStatic>();
-
-                            prop.Renderer.sharedMaterial = PropMaterial;
+                                
                             prop.Unknown = (string) keyVals["unknown"];
                             prop.VertexLighting = (string) keyVals["vlighting"];
                             prop.SetFlags((int) keyVals["flags"]);

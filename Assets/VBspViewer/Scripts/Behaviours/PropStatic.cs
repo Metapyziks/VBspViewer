@@ -38,7 +38,15 @@ namespace VBspViewer.Behaviours
                 var mdl = Map.Resources.LoadMdl(mdlPath);
 
                 _meshFilter.sharedMesh = mdl.GetMesh(0, VertexLighting);
-                _renderer.sharedMaterials = Enumerable.Repeat(_renderer.sharedMaterial, _meshFilter.sharedMesh.subMeshCount).ToArray();
+
+                var mats = new Material[_meshFilter.sharedMesh.subMeshCount];
+                for (var i = 0; i < mats.Length; ++i)
+                {
+                    var mat = Map.Resources.LoadVmt(mdl.GetMaterialName(0, i));
+                    mats[i] = mat.GetMaterial(Map.Resources);
+                }
+
+                _renderer.sharedMaterials = mats;
             }
             catch (Exception e)
             {

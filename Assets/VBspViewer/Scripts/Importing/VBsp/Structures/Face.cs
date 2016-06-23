@@ -16,7 +16,7 @@ namespace VBspViewer.Importing.VBsp.Structures
         public short TexInfo;
         public short DispInfo;
         public short FogVolumeId;
-        public int Styles;
+        public uint Styles;
         public int LightOffset;
         public float Area;
         public int LightMapOffsetX;
@@ -27,5 +27,10 @@ namespace VBspViewer.Importing.VBsp.Structures
         public ushort NumPrimitives;
         public ushort FirstPrimitive;
         public uint SmoothingGroups;
+
+        public byte GetLightStyle(int index)
+        {
+            return (byte) ((Styles >> (index << 3)) & 0xff);
+        }
     }
 }

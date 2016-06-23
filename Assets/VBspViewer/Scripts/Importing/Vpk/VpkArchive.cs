@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -26,9 +27,9 @@ namespace VBspViewer.Importing.Vpk
             {
                 _archive = archive;
                 _archiveIndex = archiveIndex;
-                _baseStream = archive.OpenArchive(archiveIndex);
+                _baseStream = archiveIndex < 32767 ? archive.OpenArchive(archiveIndex) : null;
 
-                _preloadBytesLength = preloadBytes == null ? 0 : _preloadBytes.Length;
+                _preloadBytesLength = preloadBytes == null ? 0 : preloadBytes.Length;
                 _preloadBytes = preloadBytes;
 
                 _fileOffset = offset;
@@ -55,7 +56,7 @@ namespace VBspViewer.Importing.Vpk
                     _position = preloadEnd;
                 }
 
-                if (count > 0)
+                if (count > 0 && _baseStream != null)
                 {
                     var end = Math.Min(_position + count, _fileLength);
 
@@ -95,12 +96,12 @@ namespace VBspViewer.Importing.Vpk
 
             public override bool CanRead
             {
-                get { return _baseStream.CanRead; }
+                get { return true; }
             }
 
             public override bool CanSeek
             {
-                get { return _baseStream.CanSeek; }
+                get { return true; }
             }
 
             public override bool CanWrite
@@ -130,7 +131,7 @@ namespace VBspViewer.Importing.Vpk
                 if (disposing)
                 {
                     _disposed = true;
-                    _archive.CloseArchive(_archiveIndex);
+                    if (_baseStream != null) _archive.CloseArchive(_archiveIndex);
                 }
             }
         }
@@ -153,10 +154,11 @@ namespace VBspViewer.Importing.Vpk
             }
         }
 
-        private static readonly StringBuilder _sBuilder = new StringBuilder();
+        private static StringBuilder _sBuilder;
         private static string ReadNullTerminatedString(BinaryReader reader)
         {
-            _sBuilder.Remove(0, _sBuilder.Length);
+            if (_sBuilder == null) _sBuilder = new StringBuilder();
+            else _sBuilder.Remove(0, _sBuilder.Length);
 
             while (true)
             {
@@ -313,7 +315,7 @@ namespace VBspViewer.Importing.Vpk
             var extSep = fileName.LastIndexOf('.');
 
             ext = fileName.Substring(extSep + 1);
-            path = fileName.Substring(0, dirSep);
+            path = dirSep == -1 ? "" : fileName.Substring(0, dirSep);
             name = fileName.Substring(dirSep + 1, extSep - dirSep - 1);
         }
 
@@ -325,10 +327,15 @@ namespace VBspViewer.Importing.Vpk
             Dictionary<string, Dictionary<string, DirectoryEntry>> extDict;
             if (!_fileDict.TryGetValue(ext, out extDict)) return false;
 
-            Dictionary<string, DirectoryEntry> dirDict;
-            if (!extDict.TryGetValue(path, out dirDict)) return false;
+            if (!string.IsNullOrEmpty(path))
+            {
+                Dictionary<string, DirectoryEntry> dirDict;
+                if (!extDict.TryGetValue(path, out dirDict)) return false;
 
-            return dirDict.ContainsKey(name);
+                return dirDict.ContainsKey(name);
+            }
+
+            return extDict.Values.Any(x => x.ContainsKey(name));
         }
 
         private static Exception FileNotFound(string fileName)
@@ -344,11 +351,26 @@ namespace VBspViewer.Importing.Vpk
             Dictionary<string, Dictionary<string, DirectoryEntry>> extDict;
             if (!_fileDict.TryGetValue(ext, out extDict)) throw FileNotFound(fileName);
 
-            Dictionary<string, DirectoryEntry> dirDict;
-            if (!extDict.TryGetValue(path, out dirDict)) throw FileNotFound(fileName);
+            DirectoryEntry entry = default (DirectoryEntry);
+            if (!string.IsNullOrEmpty(path))
+            {
+                Dictionary<string, DirectoryEntry> dirDict;
+                if (!extDict.TryGetValue(path, out dirDict)) throw FileNotFound(fileName);
 
-            DirectoryEntry entry;
-            if (!dirDict.TryGetValue(name, out entry)) throw FileNotFound(fileName);
+                if (!dirDict.TryGetValue(name, out entry)) throw FileNotFound(fileName);
+            }
+            else
+            {
+                var found = false;
+                foreach (var dirDict in extDict.Values)
+                {
+                    if (!dirDict.TryGetValue(name, out entry)) continue;
+                    found = true;
+                    break;
+                }
+
+                if (!found) throw FileNotFound(fileName);
+            }
 
             return new VpkStream(this, entry.ArchiveIndex, entry.EntryOffset, entry.EntryLength, entry.PreloadData);
         }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using Ionic.Zip;
 using VBspViewer.Importing;
 
@@ -12,6 +13,8 @@ namespace Assets.VBspViewer.Scripts.Importing.VBsp
         public PakFile(byte[] contents)
         {
             _zipFile = ZipFile.Read(new MemoryStream(contents));
+
+            File.WriteAllLines("pakfile.txt", _zipFile.Entries.Select(x => string.Format("{0}: {1:F2}KB", x.FileName, x.UncompressedSize / 1024f)).ToArray());
         }
 
         public bool ContainsFile(string filename)

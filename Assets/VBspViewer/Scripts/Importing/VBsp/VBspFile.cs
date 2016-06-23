@@ -169,17 +169,17 @@ namespace VBspViewer.Importing.VBsp
                     var subTex = new Texture2D(samplesWidth, samplesHeight, TextureFormat.RGB24, false);
 
                     for (var x = 0; x < samplesWidth; ++x)
-                        for (var y = 0; y < samplesHeight; ++y)
-                        {
-                            var index = face.LightOffset + ((x + y*samplesWidth) << 2);
+                    for (var y = 0; y < samplesHeight; ++y)
+                    {
+                        var index = face.LightOffset + ((x + y*samplesWidth) << 2);
 
-                            var r = LightmapSamplesHdr[index + 0];
-                            var g = LightmapSamplesHdr[index + 1];
-                            var b = LightmapSamplesHdr[index + 2];
-                            var e = (sbyte) LightmapSamplesHdr[index + 3];
+                        var r = LightmapSamplesHdr[index + 0];
+                        var g = LightmapSamplesHdr[index + 1];
+                        var b = LightmapSamplesHdr[index + 2];
+                        var e = (sbyte) LightmapSamplesHdr[index + 3];
 
-                            subTex.SetPixel(x, y, new LightmapSample {R = r, G = g, B = b, Exponent = e});
-                        }
+                        subTex.SetPixel(x, y, new LightmapSample {R = r, G = g, B = b, Exponent = e});
+                    }
 
                     textures[texIndex++] = subTex;
                 }

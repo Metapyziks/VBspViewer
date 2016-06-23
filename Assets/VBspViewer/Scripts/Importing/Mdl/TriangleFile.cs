@@ -106,18 +106,11 @@ namespace VBspViewer.Importing.Mdl
 
         private readonly int[][][] _triangles = new int[8][][];
         private readonly int[][][] _vertIndexMap = new int[8][][];
-        private readonly string[][] _materials = new string[8][];
 
         private int[][] GetVertIndexMap(int lodLevel)
         {
             if (_vertIndexMap[lodLevel] == null) GetTriangles(lodLevel);
             return _vertIndexMap[lodLevel];
-        }
-
-        private string[] GetMaterials(int lodLevel)
-        {
-            if (_materials[lodLevel] == null) GetTriangles(lodLevel);
-            return _materials[lodLevel];
         }
 
         private int[][] GetTriangles(int lodLevel)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using VBspViewer.Importing.Mdl;
 using VBspViewer.Importing.Vmt;
+using VBspViewer.Importing.Vtf;
 
 namespace VBspViewer.Importing
 {
@@ -68,10 +69,33 @@ namespace VBspViewer.Importing
             VmtFile loaded;
             if (_sLoadedVmts.TryGetValue(filename, out loaded)) return loaded;
 
-            using (var stream = OpenFile(filename))
+            var fullName = "materials/" + filename;
+            if (!ContainsFile(fullName)) fullName = filename;
+
+            using (var stream = OpenFile(fullName))
             {
                 loaded = VmtFile.FromStream(stream);
                 _sLoadedVmts.Add(filename, loaded);
+            }
+
+            return loaded;
+        }
+
+        private readonly Dictionary<string, VtfFile> _sLoadedVtfs
+            = new Dictionary<string, VtfFile>(StringComparer.CurrentCultureIgnoreCase);
+
+        public VtfFile LoadVtf(string filename)
+        {
+            VtfFile loaded;
+            if (_sLoadedVtfs.TryGetValue(filename, out loaded)) return loaded;
+
+            var fullName = "materials/" + filename;
+            if (!ContainsFile(fullName)) fullName = filename;
+
+            using (var stream = OpenFile(fullName))
+            {
+                loaded = VtfFile.FromStream(stream);
+                _sLoadedVtfs.Add(filename, loaded);
             }
 
             return loaded;

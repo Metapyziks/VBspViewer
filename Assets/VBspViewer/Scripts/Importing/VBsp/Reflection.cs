@@ -63,7 +63,17 @@ namespace VBspViewer.Importing.VBsp
         private static byte[] _sReadLumpBuffer;
 
         [ThreadStatic]
-        private static List<T> _sReadLumpList; 
+        private static List<T> _sReadLumpList;
+
+        public static T ReadSingleFromStream(Stream stream)
+        {
+            if (_sReadLumpList == null) _sReadLumpList = new List<T>();
+            else _sReadLumpList.Clear();
+
+            ReadLumpFromStream(stream, 1, _sReadLumpList);
+
+            return _sReadLumpList[0];
+        }
 
         public static void ReadLumpFromStream(Stream stream, int count, Action<T> handler)
         {
@@ -80,6 +90,25 @@ namespace VBspViewer.Importing.VBsp
                 stream.Seek(start + i*size, SeekOrigin.Begin);
                 handler(_sReadLumpList[i]);
             }
+        }
+
+        public static T[] ReadLumpFromStream(Stream stream, int count)
+        {
+            if (_sReadLumpList == null) _sReadLumpList = new List<T>();
+            else _sReadLumpList.Clear();
+
+            var size = Marshal.SizeOf(typeof (T));
+            var start = stream.Position;
+
+            ReadLumpFromStream(stream, count, _sReadLumpList);
+
+            var output = new T[count];
+            for (var i = 0; i < count; ++i)
+            {
+                output[i] = _sReadLumpList[i];
+            }
+
+            return output;
         }
 
         public static void ReadLumpFromStream(Stream stream, int count, List<T> dstList)
