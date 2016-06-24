@@ -118,6 +118,8 @@ namespace VBspViewer.Importing.Vtf
 
         private static int GetImageDataSize(int width, int height, int depth, int mipCount, Format format)
         {
+            if (mipCount == 0) return 0;
+
             var toAdd = 0;
             if (mipCount > 1) toAdd += GetImageDataSize(width >> 1, height >> 1, depth, mipCount - 1, format);
             
@@ -145,21 +147,52 @@ namespace VBspViewer.Importing.Vtf
 
             var thumbSize = GetImageDataSize(_header.LowResWidth, _header.LowResHeight, 1, 1, _header.LowResFormat);
 
-            Debug.Assert(_header.HiResFormat == Format.DXT5);
-
+            TextureFormat unityFormat;
+            switch (_header.HiResFormat)
+            {
+                case Format.DXT1: unityFormat = TextureFormat.DXT1; break;
+                case Format.DXT5: unityFormat = TextureFormat.DXT5; break;
+                default: throw new NotImplementedException(string.Format("VTF format: {0}", _header.HiResFormat));
+            }
+            
             stream.Seek(thumbSize, SeekOrigin.Current);
+            
+            var totalSize = GetImageDataSize(_header.Width, _header.Height, 1, _header.MipMapCount, _header.HiResFormat);
 
-            var bigMipSize = GetImageDataSize(_header.Width, _header.Height, 1, 1, _header.HiResFormat);
-            var offset = GetImageDataSize(_header.Width, _header.Height, 1, _header.MipMapCount, _header.HiResFormat) - bigMipSize;
+            var buffer = new byte[totalSize];
+            var width = _header.Width;
+            var height = _header.Height;
 
-            stream.Seek(offset, SeekOrigin.Current);
+            var start = stream.Position;
+            var offset = totalSize;
+            var writePos = 0;
 
-            var buffer = new byte[bigMipSize];
-            stream.Read(buffer, 0, buffer.Length);
+            for (var i = 0; i < _header.MipMapCount; ++i)
+            {
+                var size = GetImageDataSize(width, height, 1, 1, _header.HiResFormat);
 
-            _texture = new Texture2D(_header.Width, _header.Height, TextureFormat.DXT5, false);
-            _texture.LoadRawTextureData(buffer);
-            _texture.Apply();
+                offset -= size;
+
+                stream.Seek(start + offset, SeekOrigin.Begin);
+                stream.Read(buffer, writePos, size);
+
+                writePos += size;
+
+                width >>= 1;
+                height >>= 1;
+            }
+
+            try
+            {
+                _texture = new Texture2D(_header.Width, _header.Height, unityFormat, _header.MipMapCount > 1);
+                _texture.LoadRawTextureData(buffer);
+                _texture.Apply();
+            }
+            catch (UnityException e)
+            {
+                Debug.LogError(e);
+                _texture = null;
+            }
         }
 
         public Texture GetTexture()

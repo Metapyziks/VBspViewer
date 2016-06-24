@@ -106,6 +106,14 @@ namespace VBspViewer.Importing.Vmt
             return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out intValue) ? intValue : @default;
         }
 
+        public float GetSingle(string name, float @default = 0f)
+        {
+            var value = GetString(name, @default.ToString());
+
+            float floatValue;
+            return float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out floatValue) ? floatValue : @default;
+        }
+
         public bool GetBoolean(string name, bool @default = false)
         {
             var value = GetInt32(name, @default ? 1 : 0);
@@ -150,12 +158,13 @@ namespace VBspViewer.Importing.Vmt
             Default = 0,
             NoCull = 1,
             Translucent = 2,
-            AlphaTest = 4
+            AlphaTest = 4,
+            TreeSway = 8
         }
 
         private static Material _sDefaultMaterial;
 
-        private static Material GetDefaultMaterial()
+        public static Material GetDefaultMaterial()
         {
             return _sDefaultMaterial ?? (_sDefaultMaterial = CreateMaterial(MaterialFlags.Default));
         }
@@ -178,7 +187,17 @@ namespace VBspViewer.Importing.Vmt
                 shaderName += ".AlphaTest";
             }
 
-            return new Material(Shader.Find(shaderName));
+            var shader = Shader.Find(shaderName);
+            if (shader == null) throw new FileNotFoundException(string.Format("Unable to find shader '{0}'", shaderName));
+
+            var mat = new Material(shader);
+
+            if ((flags & MaterialFlags.TreeSway) == MaterialFlags.TreeSway)
+            {
+                mat.EnableKeyword("TREE_SWAY");
+            }
+
+            return mat;
         }
 
         public static VmtFile FromStream(Stream stream)
@@ -228,23 +247,34 @@ namespace VBspViewer.Importing.Vmt
             var translucent = propGroup.Value.GetBoolean("$translucent");
             var nocull = propGroup.Value.GetBoolean("$nocull");
             var basetex = propGroup.Value.GetString("$basetexture");
+            var treeSway = propGroup.Value.GetBoolean("$treesway");
 
             var flags = MaterialFlags.Default;
 
             if (nocull) flags |= MaterialFlags.NoCull;
             if (alphatest) flags |= MaterialFlags.AlphaTest;
             else if (translucent) flags |= MaterialFlags.Translucent;
+            if (treeSway) flags |= MaterialFlags.TreeSway;
 
             if (flags == MaterialFlags.Default || basetex == null) return _material = GetDefaultMaterial();
-            if (!basetex.EndsWith(".vtf")) basetex += ".vtf";
-
-            basetex = basetex.Replace('\\', '/');
 
             _material = CreateMaterial(flags);
 
-            var baseTex = loader.LoadVtf(basetex);
+            if (flags != MaterialFlags.TreeSway)
+            {
+                if (!basetex.EndsWith(".vtf")) basetex += ".vtf";
+                _material.mainTexture = loader.LoadVtf(basetex.Replace('\\', '/')).GetTexture();
+            }
 
-            _material.mainTexture = baseTex.GetTexture();
+            if ((flags & MaterialFlags.TreeSway) == MaterialFlags.TreeSway)
+            {
+                _material.SetFloat("_TreeSwayStartHeight", propGroup.Value.GetSingle("$treeSwayStartHeight", 0.5f));
+                _material.SetFloat("_TreeSwayHeight", propGroup.Value.GetSingle("$treeSwayHeight", 300f));
+                _material.SetFloat("_TreeSwayStartRadius", propGroup.Value.GetSingle("$treeSwayStartRadius", 0f));
+                _material.SetFloat("_TreeSwayRadius", propGroup.Value.GetSingle("$treeSwayRadius", 200f));
+                _material.SetFloat("_TreeSwaySpeed", propGroup.Value.GetSingle("$treeSwaySpeed", 0.2f));
+                _material.SetFloat("_TreeSwayStrength", Mathf.Min(propGroup.Value.GetSingle("$treeSwayStrength", 0.4f), 1f));
+            }
 
             return _material;
         }

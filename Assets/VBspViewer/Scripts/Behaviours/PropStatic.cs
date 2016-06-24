@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEngine;
 using JetBrains.Annotations;
 using VBspViewer.Importing.VBsp.Structures;
+using VBspViewer.Importing.Vmt;
 
 namespace VBspViewer.Behaviours
 {
@@ -21,11 +22,15 @@ namespace VBspViewer.Behaviours
         public string VertexLighting;
         public string Unknown;
         public List<string> Flags;
+        public List<string> Materials; 
 
         public void SetModel(string mdlPath)
         {
             if (StringComparer.InvariantCultureIgnoreCase.Equals(mdlPath, _curModel)) return;
             _curModel = Model = mdlPath;
+
+            if (Materials == null) Materials = new List<string>();
+            else Materials.Clear();
 
             if (string.IsNullOrEmpty(mdlPath))
             {
@@ -40,10 +45,21 @@ namespace VBspViewer.Behaviours
                 _meshFilter.sharedMesh = mdl.GetMesh(0, VertexLighting);
 
                 var mats = new Material[_meshFilter.sharedMesh.subMeshCount];
+
                 for (var i = 0; i < mats.Length; ++i)
                 {
-                    var mat = Map.Resources.LoadVmt(mdl.GetMaterialName(0, i));
-                    mats[i] = mat.GetMaterial(Map.Resources);
+                    try
+                    {
+                        var matName = mdl.GetMaterialName(0, i);
+                        Materials.Add(matName);
+                        var mat = Map.Resources.LoadVmt(matName);
+                        mats[i] = mat.GetMaterial(Map.Resources);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogException(e);
+                        mats[i] = VmtFile.GetDefaultMaterial();
+                    }
                 }
 
                 _renderer.sharedMaterials = mats;
