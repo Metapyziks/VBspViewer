@@ -144,16 +144,41 @@ namespace VBspViewer.Importing.Vmt
 
     public class VmtFile
     {
+        [Flags]
+        private enum MaterialFlags
+        {
+            Default = 0,
+            NoCull = 1,
+            Translucent = 2,
+            AlphaTest = 4
+        }
+
         private static Material _sDefaultMaterial;
 
         private static Material GetDefaultMaterial()
         {
-            return _sDefaultMaterial ?? (_sDefaultMaterial = CreateMaterial());
+            return _sDefaultMaterial ?? (_sDefaultMaterial = CreateMaterial(MaterialFlags.Default));
         }
 
-        private static Material CreateMaterial()
+        private static Material CreateMaterial(MaterialFlags flags)
         {
-            return new Material(Shader.Find("Custom/PropGeometryAlpha"));
+            var shaderName = "Custom/PropGeometry";
+
+            if ((flags & MaterialFlags.NoCull) == MaterialFlags.NoCull)
+            {
+                shaderName += ".NoCull";
+            }
+
+            if ((flags & MaterialFlags.Translucent) == MaterialFlags.Translucent)
+            {
+                shaderName += ".Translucent";
+            }
+            else if ((flags & MaterialFlags.AlphaTest) == MaterialFlags.AlphaTest)
+            {
+                shaderName += ".AlphaTest";
+            }
+
+            return new Material(Shader.Find(shaderName));
         }
 
         public static VmtFile FromStream(Stream stream)
@@ -169,7 +194,7 @@ namespace VBspViewer.Importing.Vmt
 
         private VmtFile(VmtFileReader reader)
         {
-            var shaderNameRegex = new Regex(@"^\s*(?<shader>[a-zA-Z0-9/\\]+)\s*$", RegexOptions.Compiled);
+            var shaderNameRegex = new Regex(@"^\s*(""(?<shader>[a-zA-Z0-9/\\]+)""|(?<shader>[a-zA-Z0-9/\\]+))\s*$", RegexOptions.Compiled);
 
             Match match;
             while (reader.ReadRegex(shaderNameRegex, out match))
@@ -201,15 +226,21 @@ namespace VBspViewer.Importing.Vmt
             var propGroup = _propertyGroups.First();
             var alphatest = propGroup.Value.GetBoolean("$alphatest");
             var translucent = propGroup.Value.GetBoolean("$translucent");
-            var distancealpha = propGroup.Value.GetBoolean("$distancealpha");
+            var nocull = propGroup.Value.GetBoolean("$nocull");
             var basetex = propGroup.Value.GetString("$basetexture");
 
-            if (!translucent && !alphatest && !distancealpha || basetex == null) return _material = GetDefaultMaterial();
+            var flags = MaterialFlags.Default;
+
+            if (nocull) flags |= MaterialFlags.NoCull;
+            if (alphatest) flags |= MaterialFlags.AlphaTest;
+            else if (translucent) flags |= MaterialFlags.Translucent;
+
+            if (flags == MaterialFlags.Default || basetex == null) return _material = GetDefaultMaterial();
             if (!basetex.EndsWith(".vtf")) basetex += ".vtf";
 
             basetex = basetex.Replace('\\', '/');
 
-            _material = CreateMaterial();
+            _material = CreateMaterial(flags);
 
             var baseTex = loader.LoadVtf(basetex);
 
