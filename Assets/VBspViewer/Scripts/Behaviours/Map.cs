@@ -4,6 +4,7 @@ using System.IO;
 using Assets.VBspViewer.Scripts.Importing.VBsp;
 using JetBrains.Annotations;
 using VBspViewer.Importing;
+using VBspViewer.Importing.Dem;
 using VBspViewer.Importing.VBsp;
 using VBspViewer.Importing.Entities;
 using VBspViewer.Importing.Vpk;
@@ -25,17 +26,37 @@ namespace VBspViewer.Behaviours
             }
         }
 
-        public string FilePath;
+        public string DemoName;
+        public string MapName;
+
         public Material WorldMaterial;
 
         public Texture2D Lightmap;
 
+        private DemFile _demFile;
         private VBspFile _bspFile;
 
         [UsedImplicitly]
         private void Start()
         {
-            var filePath = Path.Combine(Config.CsgoPath, Path.Combine("maps", FilePath));
+            if (!string.IsNullOrEmpty(DemoName))
+            {
+                var demPath = Path.Combine(Config.CsgoPath, Path.Combine("replays", DemoName + ".dem"));
+                if (File.Exists(demPath))
+                {
+                    _demFile = new DemFile(File.OpenRead(demPath));
+                    MapName = _demFile.MapName;
+                }
+            }
+
+            if (_demFile != null)
+            {
+                while (!_demFile.ReadSignOn) _demFile.ReadCommand();
+            }
+
+            return;
+
+            var filePath = Path.Combine(Config.CsgoPath, Path.Combine("maps", MapName + ".bsp"));
 
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
@@ -195,10 +216,21 @@ namespace VBspViewer.Behaviours
             Profiler.Print();
         }
 
+        private void Update()
+        {
+            if (_demFile != null && !_demFile.DemoFinished) _demFile.ReadCommand();
+        }
+
         [UsedImplicitly]
         private void OnDestroy()
         {
-            Resources.RemoveResourceProvider(_bspFile.PakFile);
+            //Resources.RemoveResourceProvider(_bspFile.PakFile);
+
+            if (_demFile != null)
+            {
+                _demFile.Dispose();
+                _demFile = null;
+            }
         }
     }
 }

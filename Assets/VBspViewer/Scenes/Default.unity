@@ -281,7 +281,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 104b98ee950966345b14f77b9c37c610, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  FilePath: de_overpass.bsp
+  DemoName: match730_003148991249579507879_2023390963_133
+  MapName: de_dust2
   WorldMaterial: {fileID: 2100000, guid: bc53a50f47bbfce41992abca9b6af971, type: 2}
   Lightmap: {fileID: 0}
 --- !u!4 &1929632567
