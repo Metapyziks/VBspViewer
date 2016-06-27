@@ -54,8 +54,6 @@ namespace VBspViewer.Behaviours
                 while (!_demFile.ReadSignOn) _demFile.ReadCommand();
             }
 
-            return;
-
             var filePath = Path.Combine(Config.CsgoPath, Path.Combine("maps", MapName + ".bsp"));
 
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
@@ -216,6 +214,7 @@ namespace VBspViewer.Behaviours
             Profiler.Print();
         }
 
+        [UsedImplicitly]
         private void Update()
         {
             if (_demFile != null && !_demFile.DemoFinished) _demFile.ReadCommand();
@@ -224,7 +223,7 @@ namespace VBspViewer.Behaviours
         [UsedImplicitly]
         private void OnDestroy()
         {
-            //Resources.RemoveResourceProvider(_bspFile.PakFile);
+            Resources.RemoveResourceProvider(_bspFile.PakFile);
 
             if (_demFile != null)
             {
