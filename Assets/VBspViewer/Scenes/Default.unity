@@ -283,6 +283,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   DemoName: match730_003148991249579507879_2023390963_133
   MapName: de_dust2
+  LoadMap: 0
+  DemoPlayback: 0
+  CurrentTick: 0
+  DemoTimescale: 1
   WorldMaterial: {fileID: 2100000, guid: bc53a50f47bbfce41992abca9b6af971, type: 2}
   Lightmap: {fileID: 0}
 --- !u!4 &1929632567

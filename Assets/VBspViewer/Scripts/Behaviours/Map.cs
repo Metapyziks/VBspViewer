@@ -28,6 +28,13 @@ namespace VBspViewer.Behaviours
 
         public string DemoName;
         public string MapName;
+        public bool LoadMap = true;
+        public bool DemoPlayback = false;
+        
+        public int CurrentTick;
+
+        [Range(0f, 8f)]
+        public float DemoTimescale = 1f;
 
         public Material WorldMaterial;
 
@@ -51,8 +58,10 @@ namespace VBspViewer.Behaviours
 
             if (_demFile != null)
             {
-                while (!_demFile.ReadSignOn) _demFile.ReadCommand();
+                _demFile.Initialize();
             }
+
+            if (!LoadMap) return;
 
             var filePath = Path.Combine(Config.CsgoPath, Path.Combine("maps", MapName + ".bsp"));
 
@@ -217,13 +226,17 @@ namespace VBspViewer.Behaviours
         [UsedImplicitly]
         private void Update()
         {
-            if (_demFile != null && !_demFile.DemoFinished) _demFile.ReadCommand();
+            if (_demFile != null && DemoPlayback)
+            {
+                _demFile.Update(Time.deltaTime * DemoTimescale);
+                CurrentTick = _demFile.CurrentTick;
+            }
         }
 
         [UsedImplicitly]
         private void OnDestroy()
         {
-            Resources.RemoveResourceProvider(_bspFile.PakFile);
+            if (_bspFile != null) Resources.RemoveResourceProvider(_bspFile.PakFile);
 
             if (_demFile != null)
             {
