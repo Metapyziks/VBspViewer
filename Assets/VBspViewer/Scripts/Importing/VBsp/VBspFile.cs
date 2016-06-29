@@ -427,6 +427,7 @@ namespace VBspViewer.Importing.VBsp
             string modelName, string vertexLighting)
         {
             yield return new KeyValuePair<string, EntValue>("classname", "prop_static");
+            yield return new KeyValuePair<string, EntValue>("hammerid", -1);
             yield return new KeyValuePair<string, EntValue>("origin", prop.Origin);
             yield return new KeyValuePair<string, EntValue>("angles", prop.Angles);
             yield return new KeyValuePair<string, EntValue>("model", modelName);

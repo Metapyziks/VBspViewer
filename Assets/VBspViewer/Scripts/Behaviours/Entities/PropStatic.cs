@@ -1,15 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using JetBrains.Annotations;
-using VBspViewer.Importing.VBsp.Structures;
+using VBspViewer.Behaviours.Entities;
+using VBspViewer.Importing.Entities;
 using VBspViewer.Importing.Vmt;
 
 namespace VBspViewer.Behaviours
 {
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
-    public class PropStatic : MonoBehaviour
+    [ClassName(HammerName = "prop_static")]
+    public class PropStatic : BaseEntity
     {
         private string _curModel;
 
@@ -20,17 +20,11 @@ namespace VBspViewer.Behaviours
 
         public string Model;
         public string VertexLighting;
-        public string Unknown;
-        public List<string> Flags;
-        public List<string> Materials; 
 
         public void SetModel(string mdlPath)
         {
             if (StringComparer.InvariantCultureIgnoreCase.Equals(mdlPath, _curModel)) return;
             _curModel = Model = mdlPath;
-
-            if (Materials == null) Materials = new List<string>();
-            else Materials.Clear();
 
             if (string.IsNullOrEmpty(mdlPath))
             {
@@ -40,7 +34,7 @@ namespace VBspViewer.Behaviours
             
             try
             {
-                var mdl = Map.Resources.LoadMdl(mdlPath);
+                var mdl = World.Resources.LoadMdl(mdlPath);
 
                 _meshFilter.sharedMesh = mdl.GetMesh(0, VertexLighting);
 
@@ -51,9 +45,8 @@ namespace VBspViewer.Behaviours
                     try
                     {
                         var matName = mdl.GetMaterialName(0, i);
-                        Materials.Add(matName);
-                        var mat = Map.Resources.LoadVmt(matName);
-                        mats[i] = mat.GetMaterial(Map.Resources);
+                        var mat = World.Resources.LoadVmt(matName);
+                        mats[i] = mat.GetMaterial(World.Resources);
                     }
                     catch (Exception e)
                     {
@@ -71,26 +64,37 @@ namespace VBspViewer.Behaviours
             }
         }
 
-        public void SetFlags(int flags)
+        protected override void OnKeyVal(string key, EntValue val)
         {
-            if (Flags == null) Flags = new List<string>();
-            else Flags.Clear();
-
-            foreach (var flag in Enum.GetValues(typeof(StaticPropFlag)).Cast<StaticPropFlag>())
+            switch (key)
             {
-                if (((StaticPropFlag) flags & flag) != flag) continue;
-
-                Flags.Add(flag.ToString());
+                case "vlighting":
+                    VertexLighting = (string) val;
+                    break;
+                case "model":
+                    Model = (string) val;
+                    break;
+                default:
+                    base.OnKeyVal(key, val);
+                    break;
             }
         }
 
         [UsedImplicitly]
         private void Awake()
         {
+            gameObject.isStatic = true;
+
             _renderer = GetComponent<MeshRenderer>();
             _meshFilter = GetComponent<MeshFilter>();
 
             SetModel(Model);
+        }
+
+        [UsedImplicitly]
+        private void Update()
+        {
+            if (!StringComparer.InvariantCultureIgnoreCase.Equals(Model, _curModel)) SetModel(Model);
         }
     }
 }

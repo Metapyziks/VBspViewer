@@ -263,12 +263,14 @@ GameObject:
   m_Component:
   - 4: {fileID: 1929632567}
   - 114: {fileID: 1929632566}
+  - 114: {fileID: 1929632568}
+  - 114: {fileID: 1929632569}
   m_Layer: 0
-  m_Name: Map
+  m_Name: World
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 4294967295
   m_IsActive: 1
 --- !u!114 &1929632566
 MonoBehaviour:
@@ -281,12 +283,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 104b98ee950966345b14f77b9c37c610, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  Id: 0
+  ClassId: -1
+  SerialNum: 0
+  ModelIndex: 0
   DemoName: match730_003148991249579507879_2023390963_133
   MapName: de_dust2
   LoadMap: 0
   DemoPlayback: 0
-  CurrentTick: 0
   DemoTimescale: 1
+  NetClient: {fileID: 1929632568}
+  EntityManager: {fileID: 1929632569}
   WorldMaterial: {fileID: 2100000, guid: bc53a50f47bbfce41992abca9b6af971, type: 2}
   Lightmap: {fileID: 0}
 --- !u!4 &1929632567
@@ -302,6 +309,30 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1929632568
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 1929632565}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d49e39c5e6e6be4ca08248633af5b1f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ServerTickInterval: 0
+  EntityManager: {fileID: 1929632569}
+--- !u!114 &1929632569
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 1929632565}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd1c498b33e085d428a8c091b29da5f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!43 &2071054309
 Mesh:
   m_ObjectHideFlags: 0

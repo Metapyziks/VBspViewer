@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 
-namespace VBspViewer.Importing.Dem
+namespace VBspViewer.Importing
 {
     public class BitBuffer
     {
@@ -44,6 +44,7 @@ namespace VBspViewer.Importing.Dem
         private readonly byte[] _buffer;
         private int _readOffset;
         private int _bitsAvailable;
+        private int _totalBits;
         private uint _bufferDWord;
         private bool _overflow;
 
@@ -52,6 +53,42 @@ namespace VBspViewer.Importing.Dem
             _buffer = buffer;
             _readOffset = 0;
             _bitsAvailable = 0;
+            _totalBits = buffer.Length << 3;
+
+            Seek(0);
+        }
+
+        public bool Seek(int position)
+        {
+            var success = true;
+            if (position < 0 || position > _totalBits)
+            {
+                SetOverflowFlag();
+                success = false;
+                position = _totalBits;
+            }
+
+            var head = _buffer.Length & 3;
+            var byteOffset = position >> 3;
+            if ((_buffer.Length < 4) || (head != 0 && byteOffset < head))
+            {
+                _bufferDWord = _buffer[_readOffset++];
+                if (head > 1) _bufferDWord |= (uint) _buffer[_readOffset++] << 8;
+                if (head > 2) _bufferDWord |= (uint) _buffer[_readOffset++] << 16;
+                _bufferDWord >>= (position & 31);
+                _bitsAvailable = (head << 3) - (position & 31);
+            }
+            else
+            {
+                var adjPosition = position - (head << 3);
+                _readOffset = ((adjPosition >> 5) << 2) + head;
+                _bitsAvailable = 32;
+                GrabNextDWord();
+                _bufferDWord >>= adjPosition & 31;
+                _bitsAvailable = Math.Min(_bitsAvailable, 32 - (adjPosition & 31));
+            }
+
+            return success;
         }
 
         private void FetchNext()
