@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using JetBrains.Annotations;
 using UnityEngine;
 using VBspViewer.Importing;
 using VBspViewer.Importing.Dem.Generated;
@@ -88,9 +89,14 @@ namespace VBspViewer.Behaviours.Entities
 
         internal void ReadProperty<TVal>(CSVCMsgSendTable.SendpropT prop, int index, TVal value)
         {
-            // Debug.LogFormat("{0}: {1}", prop.VarName, value);
+            //Debug.LogFormat("{0}: {1}", prop.VarName, value);
+            
+            OnReadProperty(prop.VarName, index, value);
+        }
 
-            switch (prop.VarName)
+        protected virtual void OnReadProperty<TVal>(string name, int index, TVal value)
+        {
+            switch (name)
             {
                 case "m_vecOrigin":
                     if (value is Vector2)
@@ -100,7 +106,7 @@ namespace VBspViewer.Behaviours.Entities
                     }
                     else if (value is Vector3)
                     {
-                        transform.position = ((Vector3) (object) value)*VBspFile.SourceToUnityUnits;
+                        transform.position = ((Vector3) (object) value) * VBspFile.SourceToUnityUnits;
                     }
                     return;
                 case "m_vecOrigin[2]":
@@ -137,5 +143,13 @@ namespace VBspViewer.Behaviours.Entities
                     break;
             }
         }
+
+        [UsedImplicitly]
+        private void Start()
+        {
+            OnStart();
+        }
+
+        protected virtual void OnStart() { }
     }
 }

@@ -40,7 +40,7 @@ namespace VBspViewer.Behaviours.Entities
 
     public class EntityManager : MonoBehaviour
     {
-        private delegate BaseEntity HammerNameCtor(EntityManager self, int hammerId);
+        private delegate BaseEntity HammerNameCtor(EntityManager self);
         private delegate BaseEntity ClassNameCtor(EntityManager self, int entId, int classId, uint serialNum);
 
         private static readonly Dictionary<string, HammerNameCtor> _sHammerNameCtors = new Dictionary<string, HammerNameCtor>();
@@ -57,7 +57,7 @@ namespace VBspViewer.Behaviours.Entities
                 .FirstOrDefault(x => x.Name == "AddEntity" && x.IsGenericMethod);
 
             var selfParam = Expression.Parameter(typeof (EntityManager), "self");
-            var hammerIdParam = Expression.Parameter(typeof (int), "hammerId");
+            var endIdParam = Expression.Parameter(typeof (int), "entId");
             var classIdParam = Expression.Parameter(typeof (int), "classId");
             var serialNumParam = Expression.Parameter(typeof (uint), "serialNum");
 
@@ -69,8 +69,8 @@ namespace VBspViewer.Behaviours.Entities
                 if (attrib.HammerName != null)
                 {
                     var method = createEntity.MakeGenericMethod(type);
-                    var call = Expression.Call(selfParam, method, hammerIdParam);
-                    var lambda = Expression.Lambda<HammerNameCtor>(call, selfParam, hammerIdParam);
+                    var call = Expression.Call(selfParam, method);
+                    var lambda = Expression.Lambda<HammerNameCtor>(call, selfParam);
 
                     _sHammerNameCtors.Add(attrib.HammerName, lambda.Compile());
                 }
@@ -78,8 +78,8 @@ namespace VBspViewer.Behaviours.Entities
                 if (attrib.ClassName != null)
                 {
                     var method = addEntity.MakeGenericMethod(type);
-                    var call = Expression.Call(selfParam, method, hammerIdParam, classIdParam, serialNumParam);
-                    var lambda = Expression.Lambda<ClassNameCtor>(call, selfParam, hammerIdParam, classIdParam, serialNumParam);
+                    var call = Expression.Call(selfParam, method, endIdParam, classIdParam, serialNumParam);
+                    var lambda = Expression.Lambda<ClassNameCtor>(call, selfParam, endIdParam, classIdParam, serialNumParam);
 
                     _sClassNameCtors.Add(attrib.ClassName, lambda.Compile());
                 }
@@ -372,19 +372,15 @@ namespace VBspViewer.Behaviours.Entities
             return _entities.TryGetValue(entId, out ent) ? ent : null;
         }
 
-        public TEntity CreateEntity<TEntity>(int hammerId)
+        public TEntity CreateEntity<TEntity>()
             where TEntity : BaseEntity
         {
-            var ent = FindEntity(hammerId);
-            if (ent != null) throw new ArgumentException("An entity already exists with the given ID.", "hammerId");
-
-            return AddEntity<TEntity>(hammerId, -1, 0);
+            return AddEntity<TEntity>(-1, -1, 0);
         }
 
         public BaseEntity CreateEntity(IEnumerable<KeyValuePair<string, EntValue>> keyVals)
         {
             string className = null;
-            int hammerId = -1;
 
             foreach (var keyVal in keyVals)
             {
@@ -393,20 +389,13 @@ namespace VBspViewer.Behaviours.Entities
                     case "classname":
                         className = (string) keyVal.Value;
                         break;
-                    case "hammerid":
-                        hammerId = (int) keyVal.Value;
-                        break;
                 }
             }
 
             BaseEntity inst;
-
-            if (!_entities.TryGetValue(hammerId, out inst))
-            {
-                HammerNameCtor ctor;
-                if (_sHammerNameCtors.TryGetValue(className, out ctor)) inst = ctor(this, hammerId);
-                else return null;
-            }
+            HammerNameCtor ctor;
+            if (_sHammerNameCtors.TryGetValue(className, out ctor)) inst = ctor(this);
+            else return null;
 
             inst.ReadKeyVals(keyVals);
             return inst;
@@ -452,6 +441,9 @@ namespace VBspViewer.Behaviours.Entities
 
         private void RemoveEntity(int entId)
         {
+            var ent = _entities[entId];
+            Destroy(ent.gameObject);
+
             _entities.Remove(entId);
         }
 

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
+using System.Linq;
 using JetBrains.Annotations;
 using VBspViewer.Importing;
 using VBspViewer.Importing.Dem;
@@ -10,7 +11,7 @@ using VBspViewer.Importing.Vpk;
 
 namespace VBspViewer.Behaviours.Entities
 {
-    [ClassName(HammerName = "worldspawn", ClassName = "World")]
+    [ClassName(ClassName = "World")]
     public class World : BrushEntity
     {
         private static bool _sLoadedGameArchive;
@@ -55,10 +56,9 @@ namespace VBspViewer.Behaviours.Entities
         public Texture2D Lightmap;
 
         private DemFile _demFile;
-        private VBspFile _bspFile;
+        public VBspFile BspFile { get; private set; }
 
-        [UsedImplicitly]
-        private void Start()
+        protected override void OnStart()
         {
             if (!string.IsNullOrEmpty(DemoName))
             {
@@ -86,40 +86,30 @@ namespace VBspViewer.Behaviours.Entities
 
             using (var stream = File.OpenRead(filePath))
             {
-                _bspFile = new VBspFile(stream);
+                BspFile = new VBspFile(stream);
             }
             
-            Resources.AddResourceProvider(_bspFile.PakFile);
+            Resources.AddResourceProvider(BspFile.PakFile);
 
-            Lightmap = _bspFile.GenerateLightmap();
+            Lightmap = BspFile.GenerateLightmap();
 
             WorldMaterial.SetTexture("_LightMap", Lightmap);
 
             using (Profiler.Begin("CreateEntities"))
             {
-                foreach (var entInfo in _bspFile.GetEntityKeyVals())
+                var infos = _demFile == null
+                    ? BspFile.GetEntityKeyVals().Concat(BspFile.GetStaticPropKeyVals())
+                    : BspFile.GetStaticPropKeyVals();
+
+                foreach (var entInfo in infos)
                 {
-                    var ent = EntityManager.CreateEntity(entInfo);
-                    if (ent == null) continue;
-
-                    var brushEnt = ent as BrushEntity;
-                    if (brushEnt != null && brushEnt.ModelIndex >= 0)
-                    {
-                        var meshes = _bspFile.GenerateMeshes(brushEnt.ModelIndex);
-                        foreach (var mesh in meshes)
-                        {
-                            if (mesh.vertexCount == 0) continue;
-
-                            var modelChild = new GameObject("faces", typeof(MeshFilter), typeof(MeshRenderer));
-                            modelChild.transform.SetParent(ent.transform, false);
-
-                            modelChild.GetComponent<MeshFilter>().sharedMesh = mesh;
-                            modelChild.GetComponent<MeshRenderer>().sharedMaterial = WorldMaterial;
-                            modelChild.isStatic = brushEnt.ModelIndex == 0;
-                        }
-                    }
+                    EntityManager.CreateEntity(entInfo);
                 }
             }
+
+            ModelIndex = 0;
+
+            base.OnStart();
 
             Profiler.Print();
         }
@@ -136,7 +126,7 @@ namespace VBspViewer.Behaviours.Entities
         [UsedImplicitly]
         private void OnDestroy()
         {
-            if (_bspFile != null) Resources.RemoveResourceProvider(_bspFile.PakFile);
+            if (BspFile != null) Resources.RemoveResourceProvider(BspFile.PakFile);
 
             if (_demFile != null)
             {

@@ -436,24 +436,10 @@ namespace VBspViewer.Importing.VBsp
             yield return new KeyValuePair<string, EntValue>("solid", prop.Solid);
             yield return new KeyValuePair<string, EntValue>("flags", (int) prop.Flag);
             yield return new KeyValuePair<string, EntValue>("unknown", string.Format("{0:x2}, {1:x4}, {2:x8}", prop.Unknown0, prop.Unknown1, prop.Unknown2));
-        } 
+        }
 
-        public IEnumerable<IEnumerable<KeyValuePair<string, EntValue>>> GetEntityKeyVals()
+        public IEnumerable<IEnumerable<KeyValuePair<string, EntValue>>> GetStaticPropKeyVals()
         {
-            var text = Encoding.ASCII.GetString(Entities);
-            File.WriteAllText("entities.txt", text);
-            const string stringPattern = @"""(?<{0}>([^\\""]|\\.)*)""";
-            var keyValuePattern = string.Format(stringPattern, "key") + @"\s*" + string.Format(stringPattern, "value");
-            var entityPattern = @"{(?<entity>\s*(" + keyValuePattern + @"\s*)*)}";
-
-            var entityRegex = new Regex(entityPattern);
-            var keyValueRegex = new Regex(keyValuePattern);
-
-            foreach (var entMatch in entityRegex.Matches(text).Cast<Match>())
-            {
-                yield return GetEntityKeyVals(entMatch.Value, keyValueRegex);
-            }
-
             var propLump = GameLumps.FirstOrDefault(x => x.Id == 0x73707270);
             if (propLump == null) yield break;
 
@@ -477,7 +463,7 @@ namespace VBspViewer.Importing.VBsp
                 }
 
                 var leafCount = reader.ReadInt32();
-                stream.Seek(leafCount*2, SeekOrigin.Current);
+                stream.Seek(leafCount * 2, SeekOrigin.Current);
 
                 propCount = reader.ReadInt32();
                 readOffset = (int) reader.BaseStream.Position;
@@ -500,6 +486,20 @@ namespace VBspViewer.Importing.VBsp
 
                 ++index;
             }
+        }
+
+        public IEnumerable<IEnumerable<KeyValuePair<string, EntValue>>> GetEntityKeyVals()
+        {
+            var text = Encoding.ASCII.GetString(Entities);
+            File.WriteAllText("entities.txt", text);
+            const string stringPattern = @"""(?<{0}>([^\\""]|\\.)*)""";
+            var keyValuePattern = string.Format(stringPattern, "key") + @"\s*" + string.Format(stringPattern, "value");
+            var entityPattern = @"{(?<entity>\s*(" + keyValuePattern + @"\s*)*)}";
+
+            var entityRegex = new Regex(entityPattern);
+            var keyValueRegex = new Regex(keyValuePattern);
+
+            return entityRegex.Matches(text).Cast<Match>().Select(entMatch => GetEntityKeyVals(entMatch.Value, keyValueRegex));
         }
     }
 }

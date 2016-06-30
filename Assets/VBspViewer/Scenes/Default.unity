@@ -287,9 +287,13 @@ MonoBehaviour:
   ClassId: -1
   SerialNum: 0
   ModelIndex: 0
+  CellX: 500
+  CellY: 500
+  CellZ: 500
+  Origin: {x: 0, y: 0, z: 0}
   DemoName: match730_003148991249579507879_2023390963_133
   MapName: de_dust2
-  LoadMap: 0
+  LoadMap: 1
   DemoPlayback: 0
   DemoTimescale: 1
   NetClient: {fileID: 1929632568}
