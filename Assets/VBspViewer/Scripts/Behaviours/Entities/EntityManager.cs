@@ -21,6 +21,23 @@ namespace VBspViewer.Behaviours.Entities
         public string ClassName { get; set; }
     }
 
+    public struct FlattenedProperty
+    {
+        public readonly CSVCMsgSendTable.SendpropT Property;
+        public readonly CSVCMsgSendTable.SendpropT ArrayElementProperty;
+
+        public FlattenedProperty(CSVCMsgSendTable.SendpropT prop, CSVCMsgSendTable.SendpropT arrayElemProp)
+        {
+            Property = prop;
+            ArrayElementProperty = arrayElemProp;
+        }
+
+        public override string ToString()
+        {
+            return Property.VarName;
+        }
+    }
+
     public class EntityManager : MonoBehaviour
     {
         private delegate BaseEntity HammerNameCtor(EntityManager self, int hammerId);
@@ -86,23 +103,6 @@ namespace VBspViewer.Behaviours.Entities
         }
 
         private readonly List<ServerClass> _serverClasses = new List<ServerClass>();
-        
-        private struct DtProperty
-        {
-            public readonly CSVCMsgSendTable.SendpropT Property;
-            public readonly CSVCMsgSendTable.SendpropT ArrayElementProperty;
-
-            public DtProperty(CSVCMsgSendTable.SendpropT prop, CSVCMsgSendTable.SendpropT arrayElemProp)
-            {
-                Property = prop;
-                ArrayElementProperty = arrayElemProp;
-            }
-
-            public override string ToString()
-            {
-                return Property.VarName;
-            }
-        }
 
         private class ServerClass
         {
@@ -110,14 +110,14 @@ namespace VBspViewer.Behaviours.Entities
             public string Name { get; private set; }
             public string DataTableName { get; private set; }
             public CSVCMsgSendTable DataTable { get; set; }
-            public List<DtProperty> FlattenedProps { get; private set; }
+            public List<FlattenedProperty> FlattenedProps { get; private set; }
 
             public ServerClass(BinaryReader reader)
             {
                 ClassId = reader.ReadInt16();
                 Name = ReadVarLengthString(reader);
                 DataTableName = ReadVarLengthString(reader);
-                FlattenedProps = new List<DtProperty>();
+                FlattenedProps = new List<FlattenedProperty>();
             }
 
             public override string ToString()
@@ -192,7 +192,7 @@ namespace VBspViewer.Behaviours.Entities
             return false;
         }
 
-        private void GatherProps_IterateProps(CSVCMsgSendTable table, int classId, List<DtProperty> props)
+        private void GatherProps_IterateProps(CSVCMsgSendTable table, int classId, List<FlattenedProperty> props)
         {
             for (var i = 0; i < table.Props.Count; ++i)
             {
@@ -222,15 +222,15 @@ namespace VBspViewer.Behaviours.Entities
                 else
                 {
                     props.Add((SendPropType) prop.Type == SendPropType.Array
-                        ? new DtProperty(prop, table.Props[i - 1])
-                        : new DtProperty(prop, null));
+                        ? new FlattenedProperty(prop, table.Props[i - 1])
+                        : new FlattenedProperty(prop, null));
                 }
             }
         }
 
         private void GatherProps(CSVCMsgSendTable table, int classId)
         {
-            var tempProps = new List<DtProperty>();
+            var tempProps = new List<FlattenedProperty>();
             GatherProps_IterateProps(table, classId, tempProps);
 
             var flattened = _serverClasses[classId].FlattenedProps;
@@ -456,8 +456,7 @@ namespace VBspViewer.Behaviours.Entities
             for (var i = 0; i < _fieldIndices.Count; ++i)
             {
                 var prop = props[_fieldIndices[i]];
-
-                throw new NotImplementedException();
+                ent.ReadProperty(bitBuffer, prop, 0);
             }
         }
 

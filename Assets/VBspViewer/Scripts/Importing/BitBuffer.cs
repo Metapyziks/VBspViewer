@@ -1,10 +1,29 @@
 ﻿using System;
+using System.Runtime.InteropServices;
+using System.Security.Permissions;
 using UnityEngine;
 
 namespace VBspViewer.Importing
 {
+    public enum BitCoordType
+    {
+        None,
+        LowPrecision,
+        Integral
+    };
+
     public class BitBuffer
     {
+        private static int ZigZagDecode32(uint n)
+        {
+            return (int) (n >> 1) ^ -unchecked((int)(n & 1));
+        }
+
+        private static long ZigZagDecode64(ulong n)
+        {
+            return (long) (n >> 1) ^ -unchecked((long) (n & 1));
+        }
+
         private static readonly uint[] _sMaskTable = {
             0,
             ( 1 << 1 ) - 1,
@@ -38,7 +57,7 @@ namespace VBspViewer.Importing
             ( 1 << 29 ) - 1,
             ( 1 << 30 ) - 1,
             0x7fffffff,
-            0xffffffff,
+            0xffffffff
         };
 
         private readonly byte[] _buffer;
@@ -156,6 +175,12 @@ namespace VBspViewer.Importing
             }
         }
 
+        public int ReadSBitLong(int bits)
+        {
+            var ret = (int) ReadUBitLong(bits);
+            return (ret << (32 - bits)) >> (32 - bits);
+        }
+
         public uint ReadUBitVar()
         {
             var ret = ReadUBitLong(6);
@@ -177,6 +202,172 @@ namespace VBspViewer.Importing
             }
 
             return ret;
+        }
+
+        public uint ReadVarInt32()
+        {
+            uint result = 0;
+            int count = 0;
+            uint b;
+
+            do
+            {
+                if (count == 5)
+                {
+                    return result;
+                }
+                b = ReadUBitLong(8);
+                result |= (b & 0x7F) << (7 * count);
+                ++count;
+            } while ((b & 0x80) != 0);
+
+            return result;
+        }
+
+        public int ReadSignedVarInt32()
+        {
+            return ZigZagDecode32(ReadVarInt32());
+        }
+
+        public ulong ReadVarInt64()
+        {
+            ulong result = 0;
+            int count = 0;
+            ulong b;
+
+            do
+            {
+                if (count == 10)
+                {
+                    return result;
+                }
+                b = ReadUBitLong(8);
+                result |= (b & 0x7F) << (7 * count);
+                ++count;
+            } while ((b & 0x80) != 0);
+
+            return result;
+        }
+
+        public long ReadSignedVarInt64()
+        {
+            return ZigZagDecode64(ReadVarInt64());
+        }
+
+        const int CoordIntegerBits = 14;
+        private const int CoordIntegerBitsMP = 11;
+        const int CoordFractionalBits = 5;
+        const int CoordFractionalBitsLowPrecision = 3;
+        const int CoordDenominator = 1 << CoordFractionalBits;
+        const int CoordDenominatorLowPrecision = 1 << CoordFractionalBitsLowPrecision;
+        const float CoordResolution = 1f/CoordDenominator;
+        const float CoordResolutionLowPrecision = 1f/CoordDenominatorLowPrecision;
+
+        public float ReadBitCoord()
+        {
+            var hasInt = ReadOneBit();
+            var hasFract = ReadOneBit();
+            
+            if (!hasInt && !hasFract) return 0f;
+
+            var sign = ReadOneBit() ? -1 : 1;
+
+            var intVal = 0;
+            var fractVal = 0;
+
+            if (hasInt) intVal = (int) ReadUBitLong(CoordIntegerBits);
+            if (hasFract) fractVal = (int) ReadUBitLong(CoordFractionalBits);
+
+            return sign * (intVal + fractVal* CoordResolution);
+        }
+
+        public float ReadBitCoordMP(BitCoordType coordType)
+        {
+            int sign;
+
+            var integral = coordType == BitCoordType.Integral;
+            var lowPrec = coordType == BitCoordType.LowPrecision;
+
+            var inBounds = ReadOneBit();
+
+            if (integral)
+            {
+                if (!ReadOneBit()) return 0f;
+
+                sign = ReadOneBit() ? -1 : 1;
+                return sign * ReadUBitLong(inBounds ? CoordIntegerBitsMP : CoordIntegerBits) + 1f;
+            }
+
+            var hasInt = ReadOneBit();
+            sign = ReadOneBit() ? -1 : 1;
+
+            var intVal = 0;
+
+            if (hasInt)
+            {
+                intVal = (int) ReadUBitLong(inBounds ? CoordIntegerBitsMP : CoordIntegerBits) + 1;
+            }
+
+            var fractVal = ReadUBitLong(lowPrec ? CoordFractionalBitsLowPrecision : CoordFractionalBits);
+
+            return sign*(intVal + fractVal*(lowPrec ? CoordResolutionLowPrecision : CoordResolution));
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct FloatIntUnion
+        {
+            [FieldOffset(0)]
+            public uint Uint32Val;
+
+            [FieldOffset(0)]
+            public float FloatVal;
+        }
+
+        public float ReadBitFloat()
+        {
+            var union = default(FloatIntUnion);
+            union.Uint32Val = ReadUBitLong(32);
+            return union.FloatVal;
+        }
+
+        public float ReadBitNormal()
+        {
+            const int normalFractionalBits = 11;
+            const int normalDenominator = (1 << normalFractionalBits) - 1;
+            const float normalResolution = 1f/normalDenominator;
+
+            var sign = ReadOneBit() ? -1 : 1;
+            var fractVal = ReadUBitLong(normalFractionalBits);
+            return sign*fractVal*normalResolution;
+        }
+
+        public float ReadBitCellCoord(int bits, BitCoordType coordType)
+        {
+            var integral = coordType == BitCoordType.Integral;
+            var lowPrec = coordType == BitCoordType.LowPrecision;
+
+            if (integral) return ReadUBitLong(bits);
+
+            var intVal = ReadUBitLong(bits);
+            var fractVal = ReadUBitLong(lowPrec ? CoordFractionalBitsLowPrecision : CoordFractionalBits);
+            return intVal + (fractVal*(lowPrec ? CoordResolutionLowPrecision : CoordResolution));
+        }
+
+        public void ReadBits(byte[] buffer, int bits)
+        {
+            var index = 0;
+            var bitsLeft = bits;
+
+            while (bitsLeft >= 8)
+            {
+                buffer[index++] = (byte) ReadUBitLong(8);
+                bitsLeft -= 8;
+            }
+
+            if (bitsLeft > 0)
+            {
+                buffer[index] = (byte) ReadUBitLong(bitsLeft);
+            }
         }
 
         public bool ReadOneBit()
