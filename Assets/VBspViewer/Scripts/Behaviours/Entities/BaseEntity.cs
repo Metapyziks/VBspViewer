@@ -23,7 +23,7 @@ namespace VBspViewer.Behaviours.Entities
         protected internal EntityManager Entities { get; internal set; }
 
         public int Id = -1;
-
+            
         [HideInInspector] public int ClassId = -1;
         [HideInInspector] public uint SerialNum = 0;
 
@@ -88,7 +88,30 @@ namespace VBspViewer.Behaviours.Entities
 
         internal void ReadProperty<TVal>(CSVCMsgSendTable.SendpropT prop, int index, TVal value)
         {
-            Debug.LogFormat("{0}: {1}", prop.VarName, value);
+            // Debug.LogFormat("{0}: {1}", prop.VarName, value);
+
+            switch (prop.VarName)
+            {
+                case "m_vecOrigin":
+                    if (value is Vector2)
+                    {
+                        var vec2Val = ((Vector2) (object) value) * VBspFile.SourceToUnityUnits;
+                        transform.position = new Vector3(vec2Val.x, transform.position.y, vec2Val.y);
+                    }
+                    else if (value is Vector3)
+                    {
+                        transform.position = ((Vector3) (object) value)*VBspFile.SourceToUnityUnits;
+                    }
+                    return;
+                case "m_vecOrigin[2]":
+                    if (value is float)
+                    {
+                        var oldPos = transform.position;
+                        var floatVal = ((float) (object) value) * VBspFile.SourceToUnityUnits;
+                        transform.position = new Vector3(oldPos.x, floatVal, oldPos.z);
+                    }
+                    return;
+            }
         }
 
         internal void ReadKeyVals(IEnumerable<KeyValuePair<string, EntValue>> keyVals)

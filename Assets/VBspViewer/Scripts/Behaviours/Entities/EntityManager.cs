@@ -125,12 +125,69 @@ namespace VBspViewer.Behaviours.Entities
                 return Name;
             }
 
+            [ThreadStatic]
+            private static List<int> _sPriorities; 
+
             public void SortFlattenedProps()
             {
-                FlattenedProps =
-                    FlattenedProps.OrderBy(
-                        x => (SendPropFlag) x.Property.Flags == SendPropFlag.CHANGES_OFTEN ? 64 : x.Property.Priority)
-                        .ToList();
+                if (_sPriorities == null) _sPriorities = new List<int>();
+                else _sPriorities.Clear();
+
+                _sPriorities.Add(64);
+
+                foreach (var flattenedProperty in FlattenedProps)
+                {
+                    var priority = flattenedProperty.Property.Priority;
+                    var inserted = false;
+
+                    for (var i = 0; i < _sPriorities.Count; ++i)
+                    {
+                        if (_sPriorities[i] < priority) continue;
+
+                        inserted = true;
+
+                        if (_sPriorities[i] > priority)
+                        {
+                            _sPriorities.Insert(i, priority);
+                        }
+
+                        break;
+                    }
+
+                    if (!inserted) _sPriorities.Add(priority);
+                }
+
+                var start = 0;
+                for (var i = 0; i < _sPriorities.Count; ++i)
+                {
+                    var priority = _sPriorities[i];
+
+                    while (true)
+                    {
+                        var current = start;
+                        while (current < FlattenedProps.Count)
+                        {
+                            var prop = FlattenedProps[current].Property;
+
+                            if (prop.Priority == priority ||
+                                (priority == 64 && ((SendPropFlag) prop.Flags & SendPropFlag.CHANGES_OFTEN) != 0))
+                            {
+                                if (start != current)
+                                {
+                                    var temp = FlattenedProps[start];
+                                    FlattenedProps[start] = FlattenedProps[current];
+                                    FlattenedProps[current] = temp;
+                                }
+
+                                ++start;
+                                break;
+                            }
+                            ++current;
+                        }
+
+                        if (current == FlattenedProps.Count) break;
+                    }
+                }
             }
         }
 
@@ -455,7 +512,8 @@ namespace VBspViewer.Behaviours.Entities
             var props = _serverClasses[(int) ent.ClassId].FlattenedProps;
             for (var i = 0; i < _fieldIndices.Count; ++i)
             {
-                var prop = props[_fieldIndices[i]];
+                var fieldIndex = _fieldIndices[i];
+                var prop = props[fieldIndex];
                 ent.ReadProperty(bitBuffer, prop, 0);
             }
         }
@@ -472,7 +530,7 @@ namespace VBspViewer.Behaviours.Entities
 
             while (updateType < UpdateType.Finished)
             {
-                var isEntity = headerCount-- >= 0;
+                var isEntity = --headerCount >= 0;
                 if (isEntity)
                 {
                     updateFlags = UpdateFlags.Zero;

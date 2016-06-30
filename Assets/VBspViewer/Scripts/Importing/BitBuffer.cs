@@ -275,7 +275,7 @@ namespace VBspViewer.Importing
             var intVal = 0;
             var fractVal = 0;
 
-            if (hasInt) intVal = (int) ReadUBitLong(CoordIntegerBits);
+            if (hasInt) intVal = (int) ReadUBitLong(CoordIntegerBits) + 1;
             if (hasFract) fractVal = (int) ReadUBitLong(CoordFractionalBits);
 
             return sign * (intVal + fractVal* CoordResolution);

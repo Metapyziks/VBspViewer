@@ -199,13 +199,12 @@ namespace VBspViewer.Importing.Dem
         public void Update(float dt)
         {
             _deltaTime += dt;
-            while (_deltaTime > NetClient.ServerTickInterval)
-            {
-                _deltaTime -= NetClient.ServerTickInterval;
-                _clientTick += 1;
+            if (!(_deltaTime > NetClient.ServerTickInterval)) return;
 
-                while (ReadCommand(_clientTick)) ;
-            }
+            _deltaTime -= NetClient.ServerTickInterval;
+            _clientTick += 1;
+
+            while (ReadCommand(_clientTick)) ;
         }
 
         public bool ReadCommand(int maxTick = int.MaxValue)
