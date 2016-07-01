@@ -21,19 +21,18 @@ namespace VBspViewer.Behaviours.Entities
             }
         }
 
-        protected internal EntityManager Entities { get; internal set; }
+        protected internal World World { get; internal set; }
 
         public int Id = -1;
             
         [HideInInspector] public int ClassId = -1;
         [HideInInspector] public uint SerialNum = 0;
 
-        [DtProp("m_vecOrigin")]
-        public Vector3 Origin
-        {
-            get { return transform.position; }
-            set { transform.position = value; }
-        }
+        [HideInInspector] public int CellX = 512;
+        [HideInInspector] public int CellY = 512;
+        [HideInInspector] public int CellZ = 512;
+
+        [HideInInspector] public Vector3 Origin;
 
         //[DtProp("m_vecAngles")]
         public Quaternion Angles
@@ -98,26 +97,45 @@ namespace VBspViewer.Behaviours.Entities
         {
             switch (name)
             {
+                case "m_cellX":
+                    CellX = (int) (object) value;
+                    UpdatePosition();
+                    return;
+                case "m_cellY":
+                    CellZ = (int) (object) value;
+                    UpdatePosition();
+                    return;
+                case "m_cellZ":
+                    CellY = (int) (object) value;
+                    UpdatePosition();
+                    return;
                 case "m_vecOrigin":
                     if (value is Vector2)
                     {
-                        var vec2Val = ((Vector2) (object) value) * VBspFile.SourceToUnityUnits;
-                        transform.position = new Vector3(vec2Val.x, transform.position.y, vec2Val.y);
+                        var vec2Val = (Vector2) (object) value;
+                        Origin = new Vector3(vec2Val.x, Origin.y, vec2Val.y);
                     }
                     else if (value is Vector3)
                     {
-                        transform.position = ((Vector3) (object) value) * VBspFile.SourceToUnityUnits;
+                        Origin = (Vector3) (object) value;
                     }
+                    UpdatePosition();
                     return;
                 case "m_vecOrigin[2]":
                     if (value is float)
                     {
-                        var oldPos = transform.position;
-                        var floatVal = ((float) (object) value) * VBspFile.SourceToUnityUnits;
-                        transform.position = new Vector3(oldPos.x, floatVal, oldPos.z);
+                        var floatVal = (float) (object) value;
+                        Origin = new Vector3(Origin.x, floatVal, Origin.z);
                     }
+                    UpdatePosition();
                     return;
             }
+        }
+
+        private void UpdatePosition()
+        {
+            transform.localPosition = (new Vector3(CellX - 512, CellY - 512, CellZ - 512) * 32f
+                + Origin) * VBspFile.SourceToUnityUnits;
         }
 
         internal void ReadKeyVals(IEnumerable<KeyValuePair<string, EntValue>> keyVals)
@@ -136,13 +154,22 @@ namespace VBspViewer.Behaviours.Entities
                     name = (string) val;
                     break;
                 case "origin":
-                    Origin = (Vector3) val*VBspFile.SourceToUnityUnits;
+                    Origin = (Vector3) val;
+                    UpdatePosition();
                     break;
                 case "angles":
                     Angles = (Quaternion) val;
                     break;
             }
         }
+
+        [UsedImplicitly]
+        private void Awake()
+        {
+            OnAwake();
+        }
+
+        protected virtual void OnAwake() { }
 
         [UsedImplicitly]
         private void Start()

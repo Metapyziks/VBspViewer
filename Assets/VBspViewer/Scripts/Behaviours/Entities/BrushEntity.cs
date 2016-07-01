@@ -1,6 +1,5 @@
 ﻿using UnityEngine;
 using VBspViewer.Importing.Entities;
-using VBspViewer.Importing.VBsp;
 
 namespace VBspViewer.Behaviours.Entities
 {
@@ -8,11 +7,6 @@ namespace VBspViewer.Behaviours.Entities
     public class BrushEntity : BaseEntity
     {
         public int ModelIndex = -1;
-
-        public int CellX = 500;
-        public int CellY = 500;
-        public int CellZ = 500;
-        public Vector3 Origin;
 
         protected override void OnKeyVal(string key, EntValue val)
         {
@@ -33,23 +27,7 @@ namespace VBspViewer.Behaviours.Entities
             switch (name)
             {
                 case "m_nModelIndex":
-                    ModelIndex = (int) (object) value;
-                    return;
-                case "m_cellX":
-                    CellX = (int) (object) value;
-                    UpdatePosition();
-                    return;
-                case "m_cellY":
-                    CellZ = (int) (object) value;
-                    UpdatePosition();
-                    return;
-                case "m_cellZ":
-                    CellY = (int) (object) value;
-                    UpdatePosition();
-                    return;
-                case "m_vecOrigin":
-                    Origin = (Vector3) (object) value;
-                    UpdatePosition();
+                    ModelIndex = (int) (object) value - 1;
                     return;
                 default:
                     base.OnReadProperty(name, index, value);
@@ -57,22 +35,15 @@ namespace VBspViewer.Behaviours.Entities
             }
         }
 
-        private void UpdatePosition()
-        {
-            transform.position = (new Vector3(CellX - 500, CellY - 500, CellZ - 500) * 32f
-                + Origin) * VBspFile.SourceToUnityUnits;
-        }
-
         protected override void OnStart()
         {
             base.OnStart();
 
             if (ModelIndex < 0) return;
+            
+            if (World == null || World.BspFile == null) return;
 
-            var world = Entities.FindEntity(0) as World;
-            if (world == null || world.BspFile == null) return;
-
-            var meshes = world.BspFile.GenerateMeshes(ModelIndex);
+            var meshes = World.BspFile.GenerateMeshes(ModelIndex);
             foreach (var mesh in meshes)
             {
                 if (mesh.vertexCount == 0) continue;
@@ -81,7 +52,7 @@ namespace VBspViewer.Behaviours.Entities
                 modelChild.transform.SetParent(transform, false);
 
                 modelChild.GetComponent<MeshFilter>().sharedMesh = mesh;
-                modelChild.GetComponent<MeshRenderer>().sharedMaterial = world.WorldMaterial;
+                modelChild.GetComponent<MeshRenderer>().sharedMaterial = World.WorldMaterial;
                 modelChild.isStatic = ModelIndex == 0;
             }
         }

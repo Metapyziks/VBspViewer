@@ -423,7 +423,7 @@ namespace VBspViewer.Behaviours.Entities
             if (ent == null)
             {
                 ent = new GameObject(classId >= 0 ? _serverClasses[classId].Name : typeof(TEntity).Name).AddComponent<TEntity>();
-                ent.Entities = this;
+                ent.World = (World) FindEntity(0);
                 ent.Id = entId;
 
                 if (entId >= 0) _entities.Add(entId, ent);
@@ -590,10 +590,11 @@ namespace VBspViewer.Behaviours.Entities
         private void Awake()
         {
             var ents = FindObjectsOfType<BaseEntity>();
+            var world = (World) ents.First(x => x is World);
 
             foreach (var ent in ents)
             {
-                ent.Entities = this;
+                ent.World = world;
 
                 if (ent.Id >= 0)
                 {

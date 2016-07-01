@@ -18,6 +18,17 @@ namespace VBspViewer.Behaviours
     public class NetClient : MonoBehaviour
     {
         [AttributeUsage(AttributeTargets.Method), MeansImplicitUse]
+        private class GameEventHandlerAttribute : Attribute
+        {
+            public string EventName { get; set; }
+
+            public GameEventHandlerAttribute(string eventName)
+            {
+                EventName = eventName;
+            }
+        }
+
+        [AttributeUsage(AttributeTargets.Method), MeansImplicitUse]
         private class PacketHandlerAttribute : Attribute
         {
             public int PacketId { get; set; }
@@ -120,7 +131,28 @@ namespace VBspViewer.Behaviours
             Wstring = 8
         }
 
+        private delegate void GameEventHandler(NetClient self, CSVCMsgGameEvent message);
+
+        private static Dictionary<string, MethodInfo> _sGameEventHandlerMethods;
+        private static Dictionary<string, MethodInfo> GetGameEventHandlerMethods()
+        {
+            if (_sGameEventHandlerMethods != null) return _sGameEventHandlerMethods;
+
+            _sGameEventHandlerMethods = new Dictionary<string, MethodInfo>();
+
+            foreach (var method in typeof (NetClient).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic))
+            {
+                var attrib = (GameEventHandlerAttribute) method.GetCustomAttributes(typeof (GameEventHandlerAttribute), false).FirstOrDefault();
+                if (attrib == null) continue;
+
+                _sGameEventHandlerMethods.Add(attrib.EventName, method);
+            }
+
+            return _sGameEventHandlerMethods;
+        } 
+
         private readonly Dictionary<int, CSVCMsgGameEventList.DescriptorT> _gameEvents = new Dictionary<int, CSVCMsgGameEventList.DescriptorT>();
+        private readonly Dictionary<int, GameEventHandler> _gameEventHandlers = new Dictionary<int, GameEventHandler>();
 
         [PacketHandler]
         private void HandlePacket(CSVCMsgGameEventList message)
@@ -128,7 +160,82 @@ namespace VBspViewer.Behaviours
             foreach (var descriptor in message.Descriptors)
             {
                 if (_gameEvents.ContainsKey(descriptor.Eventid)) _gameEvents[descriptor.Eventid] = descriptor;
-                else _gameEvents.Add(descriptor.Eventid, descriptor);
+                else
+                {
+                    _gameEvents.Add(descriptor.Eventid, descriptor);
+                }
+
+                GenerateGameEventHandler(descriptor);
+            }
+        }
+
+        private static Dictionary<GameEventType, MethodInfo> _sGameEventValueGetters;
+        private static Dictionary<GameEventType, MethodInfo> GetGameEventValueGetters()
+        {
+            if (_sGameEventValueGetters != null) return _sGameEventValueGetters;
+
+            _sGameEventValueGetters = new Dictionary<GameEventType, MethodInfo>();
+
+            foreach (var type in Enum.GetValues(typeof(GameEventType)).Cast<GameEventType>())
+            {
+                var property = typeof (CSVCMsgGameEvent.KeyT).GetProperty("Val" + type);
+                if (property == null) throw new Exception(string.Format("Could not find property for 'GameEventType.{0}'.", type));
+
+                _sGameEventValueGetters.Add(type, property.GetGetMethod());
+            }
+
+            return _sGameEventValueGetters;
+        }
+
+        [UsedImplicitly]
+        private static CSVCMsgGameEvent.KeyT GetGameEventValue(CSVCMsgGameEvent message, int index)
+        {
+            return message.Keys[index];
+        }
+
+        private void GenerateGameEventHandler(CSVCMsgGameEventList.DescriptorT descriptor)
+        {
+            MethodInfo method;
+            if (!GetGameEventHandlerMethods().TryGetValue(descriptor.Name, out method)) return;
+
+            var getters = GetGameEventValueGetters();
+
+            var selfParam = Expression.Parameter(typeof (NetClient), "self");
+            var messageParam = Expression.Parameter(typeof (CSVCMsgGameEvent), "message");
+
+            var getValueMethod = typeof (NetClient).GetMethod("GetGameEventValue",
+                BindingFlags.Static | BindingFlags.NonPublic);
+
+            var parameters = method.GetParameters();
+            var paramValues = new Expression[parameters.Length];
+
+            for (var i = 0; i < parameters.Length; ++i)
+            {
+                var parameter = parameters[i];
+                var keyIndex = descriptor.Keys.FindIndex(x => x.Name == parameter.Name);
+                if (keyIndex == -1)
+                {
+                    throw new Exception(string.Format("Could not find a game event key for '{0}.{1}' in method '{2}'.",
+                        descriptor.Name, parameter, method.Name));
+                }
+
+                var keyIndexConst = Expression.Constant(keyIndex);
+                var getter = getters[(GameEventType) descriptor.Keys[keyIndex].Type];
+                var getValueCall = Expression.Call(getValueMethod, messageParam, keyIndexConst);
+
+                paramValues[i] = Expression.Call(getValueCall, getter);
+            }
+
+            var handlerCall = Expression.Call(selfParam, method, paramValues);
+            var lambda = Expression.Lambda<GameEventHandler>(handlerCall, selfParam, messageParam);
+
+            if (_gameEventHandlers.ContainsKey(descriptor.Eventid))
+            {
+                _gameEventHandlers[descriptor.Eventid] = lambda.Compile();
+            }
+            else
+            {
+                _gameEventHandlers.Add(descriptor.Eventid, lambda.Compile());
             }
         }
 
@@ -138,11 +245,75 @@ namespace VBspViewer.Behaviours
             ServerTickInterval = message.TickInterval;
         }
 
+        public class PlayerInfo
+        {
+            public string Name { get; set; }
+            public int Team { get; set; }
+            public int EntityIndex { get; set; }
+            public string NetworkId { get; set; }
+            public string Address { get; set; }
+        }
+
+        private readonly Dictionary<int, PlayerInfo> _players = new Dictionary<int, PlayerInfo>();
+
+        public PlayerInfo GetPlayerInfo(int userid)
+        {
+            PlayerInfo player;
+            return _players.TryGetValue(userid, out player) ? player : null;
+        }
+
+        public PlayerInfo GetPlayerInfoFromEntityIndex(int entityindex)
+        {
+            return _players.FirstOrDefault(x => x.Value.EntityIndex == entityindex).Value;
+        }
+
+        [GameEventHandler("player_connect")]
+        private void HandlePlayerConnect(string name, int index, int userid, string networkid, string address)
+        {
+            PlayerInfo player;
+            if (!_players.TryGetValue(userid, out player))
+            {
+                player = new PlayerInfo();
+                _players.Add(userid, player);
+            }
+
+            player.Name = name;
+            player.EntityIndex = index;
+            player.NetworkId = networkid;
+            player.Address = address;
+        }
+
+        [GameEventHandler("player_team")]
+        private void HandlePlayerConnect(int userid, int team, int oldteam, bool disconnect, bool silent)
+        {
+            if (disconnect) return;
+
+            PlayerInfo player;
+            if (!_players.TryGetValue(userid, out player)) return;
+
+            player.Team = team;
+        }
+
+        [GameEventHandler("player_disconnect")]
+        private void HandlePlayerConnect(string name, int userid, string reason)
+        {
+            PlayerInfo player;
+            if (!_players.TryGetValue(userid, out player)) return;
+
+            _players.Remove(userid);
+        }
+
         [PacketHandler]
         private void HandlePacket(CSVCMsgGameEvent message)
         {
             CSVCMsgGameEventList.DescriptorT descriptor;
             if (!_gameEvents.TryGetValue(message.Eventid, out descriptor)) return;
+
+            GameEventHandler handler;
+            if (_gameEventHandlers.TryGetValue(message.Eventid, out handler))
+            {
+                handler(this, message);
+            }
 
             if (descriptor.Name == "player_footstep") return;
 

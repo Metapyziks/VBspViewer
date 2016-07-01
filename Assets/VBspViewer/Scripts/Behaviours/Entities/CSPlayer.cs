@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using JetBrains.Annotations;
-using UnityEditor;
+﻿using JetBrains.Annotations;
 using UnityEngine;
 using VBspViewer.Importing.VBsp;
-using VBspViewer.Importing.VBsp.Structures;
 using PrimitiveType = UnityEngine.PrimitiveType;
 
 namespace VBspViewer.Behaviours.Entities
@@ -15,10 +9,14 @@ namespace VBspViewer.Behaviours.Entities
     public class CSPlayer : BaseEntity
     {
         private Camera _camera;
+        private NetClient.PlayerInfo _info;
 
-        [UsedImplicitly]
-        private void Awake()
+        public string Nick;
+
+        protected override void OnAwake()
         {
+            base.OnAwake();
+
             var capsule = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             capsule.transform.SetParent(transform, false);
             capsule.transform.localScale = new Vector3(16f, 36f, 16f) * VBspFile.SourceToUnityUnits;
@@ -30,7 +28,7 @@ namespace VBspViewer.Behaviours.Entities
             _camera.transform.localPosition = Vector3.up*64f*VBspFile.SourceToUnityUnits;
             _camera.enabled = false;
         }
-
+        
         protected override void OnReadProperty<TVal>(string name, int index, TVal value)
         {
             switch (name)
@@ -53,6 +51,18 @@ namespace VBspViewer.Behaviours.Entities
                     base.OnReadProperty(name, index, value);
                     return;
             }
+        }
+
+        [UsedImplicitly]
+        private void Update()
+        {
+            if (_info != null)
+            {
+                Nick = _info.Name;
+                return;
+            }
+
+            _info = World.NetClient.GetPlayerInfoFromEntityIndex(Id);
         }
     }
 }
