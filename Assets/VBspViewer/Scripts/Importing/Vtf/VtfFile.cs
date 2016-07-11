@@ -118,14 +118,14 @@ namespace VBspViewer.Importing.Vtf
 
         private static int GetImageDataSize(int width, int height, int depth, int mipCount, Format format)
         {
-            if (mipCount == 0) return 0;
+            if (mipCount == 0 || width == 0 && height == 0) return 0;
 
             var toAdd = 0;
             if (mipCount > 1) toAdd += GetImageDataSize(width >> 1, height >> 1, depth, mipCount - 1, format);
             
             // TODO: move this when supporting non-DXT formats
-            if (width < 4 && width > 0) width = 4;
-            if (height < 4 && height > 0) height = 4;
+            if (width < 4) width = 4;
+            if (height < 4) height = 4;
 
             switch (format)
             {
@@ -191,7 +191,6 @@ namespace VBspViewer.Importing.Vtf
             catch (UnityException e)
             {
                 Debug.LogError(e);
-                _texture = null;
             }
         }
 
