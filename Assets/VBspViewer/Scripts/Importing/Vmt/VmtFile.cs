@@ -159,19 +159,28 @@ namespace VBspViewer.Importing.Vmt
             NoCull = 1,
             Translucent = 2,
             AlphaTest = 4,
-            TreeSway = 8
+            TreeSway = 8,
+            Lightmapped = 16
         }
 
-        private static Material _sDefaultMaterial;
+        private static Material _sDefaultVertLitMaterial;
+        private static Material _sDefaultLightmappedMaterial;
 
-        public static Material GetDefaultMaterial()
+        public static Material GetDefaultMaterial(bool lightmapped)
         {
-            return _sDefaultMaterial ?? (_sDefaultMaterial = CreateMaterial(MaterialFlags.Default));
+            if (!lightmapped)
+            {
+                return _sDefaultVertLitMaterial ?? (_sDefaultVertLitMaterial = CreateMaterial(MaterialFlags.Default));
+            }
+
+            return _sDefaultLightmappedMaterial ?? (_sDefaultLightmappedMaterial = CreateMaterial(MaterialFlags.Lightmapped));
         }
 
         private static Material CreateMaterial(MaterialFlags flags)
         {
-            var shaderName = "Custom/PropGeometry";
+            var shaderName = ((flags & MaterialFlags.Lightmapped) == MaterialFlags.Lightmapped)
+                ? "Custom/WorldGeometry"
+                : "Custom/PropGeometry";
 
             if ((flags & MaterialFlags.NoCull) == MaterialFlags.NoCull)
             {
@@ -240,9 +249,11 @@ namespace VBspViewer.Importing.Vmt
         public Material GetMaterial(ResourceLoader loader)
         {
             if (_material != null) return _material;
-            if (_propertyGroups.Count == 0) return _material = GetDefaultMaterial();
+            if (_propertyGroups.Count == 0) return null;
 
             var propGroup = _propertyGroups.First();
+            var name = propGroup.Key.ToLower();
+            var lightmapped = name == "lightmappedgeneric" || name == "worldvertextransition";
             var alphatest = propGroup.Value.GetBoolean("$alphatest");
             var translucent = propGroup.Value.GetBoolean("$translucent");
             var nocull = propGroup.Value.GetBoolean("$nocull");
@@ -251,12 +262,13 @@ namespace VBspViewer.Importing.Vmt
 
             var flags = MaterialFlags.Default;
 
+            if (lightmapped) flags |= MaterialFlags.Lightmapped;
             if (nocull) flags |= MaterialFlags.NoCull;
             if (alphatest) flags |= MaterialFlags.AlphaTest;
             else if (translucent) flags |= MaterialFlags.Translucent;
             if (treeSway) flags |= MaterialFlags.TreeSway;
 
-            if (flags == MaterialFlags.Default || basetex == null) return _material = GetDefaultMaterial();
+            if (flags == MaterialFlags.Default || flags == MaterialFlags.Lightmapped || basetex == null) return _material = GetDefaultMaterial(lightmapped);
 
             _material = CreateMaterial(flags);
 

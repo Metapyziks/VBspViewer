@@ -44,15 +44,15 @@ namespace VBspViewer.Behaviours.Entities
             if (World == null || World.BspFile == null) return;
 
             var meshes = World.BspFile.GenerateMeshes(ModelIndex);
-            foreach (var mesh in meshes)
+            foreach (var group in meshes)
             {
-                if (mesh.vertexCount == 0) continue;
+                if (group.Mesh.vertexCount == 0) continue;
 
                 var modelChild = new GameObject("faces", typeof(MeshFilter), typeof(MeshRenderer));
                 modelChild.transform.SetParent(transform, false);
 
-                modelChild.GetComponent<MeshFilter>().sharedMesh = mesh;
-                modelChild.GetComponent<MeshRenderer>().sharedMaterial = World.WorldMaterial;
+                modelChild.GetComponent<MeshFilter>().sharedMesh = group.Mesh;
+                modelChild.GetComponent<MeshRenderer>().sharedMaterials = group.Materials;
                 modelChild.isStatic = ModelIndex == 0;
             }
         }

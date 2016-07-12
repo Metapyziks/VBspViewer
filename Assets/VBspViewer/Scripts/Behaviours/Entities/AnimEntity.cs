@@ -54,7 +54,7 @@ namespace VBspViewer.Behaviours.Entities
                     catch (Exception e)
                     {
                         Debug.LogException(e);
-                        mats[i] = VmtFile.GetDefaultMaterial();
+                        mats[i] = VmtFile.GetDefaultMaterial(false);
                     }
                 }
 
