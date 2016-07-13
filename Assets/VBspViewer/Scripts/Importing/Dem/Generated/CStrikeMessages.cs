@@ -323,8 +323,16 @@ namespace VBspViewer.Importing.Dem.Generated
             /// <summary> 		...</summary>
             public int NumBits { get; set; }
 
+            public override string ToString()
+            {
+                return string.Format("{0} {1}", (SendPropType) Type, VarName);
+            }
         }
 
+        public override string ToString()
+        {
+            return NetTableName;
+        }
     }
 
     public partial class CSVCMsgPrint

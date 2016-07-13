@@ -33,13 +33,7 @@ namespace VBspViewer.Behaviours.Entities
         [HideInInspector] public int CellZ = 512;
 
         [HideInInspector] public Vector3 Origin;
-
-        //[DtProp("m_vecAngles")]
-        public Quaternion Angles
-        {
-            get { return transform.rotation; }
-            set { transform.rotation = value; }
-        }
+        [HideInInspector] public Vector3 Angles;
 
         internal void ReadProperty(BitBuffer bitBuffer, FlattenedProperty flatProp, int index)
         {
@@ -109,6 +103,14 @@ namespace VBspViewer.Behaviours.Entities
                     CellY = (int) (object) value;
                     UpdatePosition();
                     return;
+                case "m_angRotation":
+                    if (value is Vector3)
+                    {
+                        var val = (Vector3) (object) value;
+                        Angles = new Vector3(val.x, -val.z, val.y);
+                    }
+                    UpdatePosition();
+                    return;
                 case "m_vecOrigin":
                     if (value is Vector2)
                     {
@@ -136,6 +138,7 @@ namespace VBspViewer.Behaviours.Entities
         {
             transform.localPosition = (new Vector3(CellX - 512, CellY - 512, CellZ - 512) * 32f
                 + Origin) * VBspFile.SourceToUnityUnits;
+            transform.localRotation = Quaternion.Euler(Angles);
         }
 
         internal void ReadKeyVals(IEnumerable<KeyValuePair<string, EntValue>> keyVals)
@@ -158,7 +161,8 @@ namespace VBspViewer.Behaviours.Entities
                     UpdatePosition();
                     break;
                 case "angles":
-                    Angles = (Quaternion) val;
+                    Angles = ((Quaternion) val).eulerAngles;
+                    UpdatePosition();
                     break;
             }
         }
