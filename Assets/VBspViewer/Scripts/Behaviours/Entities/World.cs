@@ -51,10 +51,6 @@ namespace VBspViewer.Behaviours.Entities
         public NetClient NetClient;
         public EntityManager EntityManager;
 
-        public Material WorldMaterial;
-
-        public Texture2D Lightmap;
-
         private DemFile _demFile;
         public VBspFile BspFile { get; private set; }
 
@@ -90,10 +86,6 @@ namespace VBspViewer.Behaviours.Entities
             }
             
             Resources.AddResourceProvider(BspFile.PakFile);
-
-            Lightmap = BspFile.GenerateLightmap();
-
-            WorldMaterial.SetTexture("_LightMap", Lightmap);
 
             using (Profiler.Begin("CreateEntities"))
             {

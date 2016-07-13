@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Assets.VBspViewer.Scripts.Importing.VBsp;
 using UnityEngine;
+using VBspViewer.Behaviours.Entities;
 using VBspViewer.Importing.Entities;
 using VBspViewer.Importing.VBsp.Structures;
 using Plane = VBspViewer.Importing.VBsp.Structures.Plane;
@@ -113,6 +114,9 @@ namespace VBspViewer.Importing.VBsp
         [Lump(Type = LumpType.LUMP_TEXINFO)]
         private TextureInfo[] TexInfos { get; set; }
 
+        [Lump(Type = LumpType.LUMP_TEXDATA)]
+        private TextureData[] TexData { get; set; }
+
         [Lump(Type = LumpType.LUMP_DISPINFO)]
         private DispInfo[] DispInfos { get; set; }
 
@@ -143,15 +147,25 @@ namespace VBspViewer.Importing.VBsp
         [Lump(Type = LumpType.LUMP_MODELS)]
         private Model[] Models { get; set; }
 
+        [Lump(Type = LumpType.LUMP_TEXDATA_STRING_DATA)]
+        private byte[] TexdataStringData { get; set; }
+
+        [Lump(Type = LumpType.LUMP_TEXDATA_STRING_TABLE)]
+        private int[] TexdataStringTable { get; set; }
+
         private GameLumpInfo[] GameLumps { get; set; }
         
         private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>();
 
         public PakFile PakFile { get; private set; }
 
-        public Texture2D GenerateLightmap()
+        private Texture2D _lightmap;
+
+        public Texture2D GetLightmap()
         {
-            var texture = new Texture2D(1, 1, TextureFormat.RGB24, false);
+            if (_lightmap != null) return _lightmap;
+
+            _lightmap = new Texture2D(1, 1, TextureFormat.RGB24, false);
 
             var litFaces = FacesHdr.Count(x => x.LightOffset != -1);
             var textures = new Texture2D[litFaces];
@@ -188,7 +202,7 @@ namespace VBspViewer.Importing.VBsp
             using (Profiler.Begin("GenerateLightmap"))
             {
                 _lightmapRects.Clear();
-                var rects = texture.PackTextures(textures, 0);
+                var rects = _lightmap.PackTextures(textures, 0);
 
                 var texIndex = 0;
                 for (var faceIndex = 0; faceIndex < FacesHdr.Length; ++faceIndex)
@@ -200,8 +214,8 @@ namespace VBspViewer.Importing.VBsp
                     _lightmapRects.Add(faceIndex, rect);
                 }
 
-                texture.Apply();
-                return texture;
+                _lightmap.Apply();
+                return _lightmap;
             }
         }
 
@@ -265,7 +279,28 @@ namespace VBspViewer.Importing.VBsp
             return origin + (Vector3) vert.Vector*vert.Distance;
         }
 
-        private Mesh GenerateMesh(MeshBuilder meshGen, IEnumerable<int> faceIndices)
+        [ThreadStatic]
+        private static StringBuilder _sTexdataStringBuilder;
+
+        private string GetTexdataString(int id)
+        {
+            var offset = TexdataStringTable[id];
+
+            if (_sTexdataStringBuilder == null) _sTexdataStringBuilder = new StringBuilder(128);
+            else _sTexdataStringBuilder.Remove(0, _sTexdataStringBuilder.Length);
+
+            for (; offset < TexdataStringData.Length; ++offset)
+            {
+                var c = (char) TexdataStringData[offset];
+                if (c == '\0') break;
+
+                _sTexdataStringBuilder.Append(c);
+            }
+
+            return _sTexdataStringBuilder.ToString();
+        }
+
+        private MeshGroup GenerateMesh(MeshBuilder meshGen, IEnumerable<int> faceIndices)
         {
             var mesh = new Mesh();
             var primitiveIndices = new List<int>();
@@ -273,6 +308,7 @@ namespace VBspViewer.Importing.VBsp
             const SurfFlags ignoreFlags = SurfFlags.NODRAW | SurfFlags.SKIP | SurfFlags.SKY | SurfFlags.SKY2D | SurfFlags.HINT | SurfFlags.TRIGGER;
 
             var corners = new Vector3[4];
+            var lightmap = GetLightmap();
 
             using (Profiler.Begin("GenerateMesh"))
             {
@@ -282,7 +318,12 @@ namespace VBspViewer.Importing.VBsp
                     var plane = Planes[face.PlaneNum];
                     var tex = TexInfos[face.TexInfo];
 
-                    if ((tex.Flags & ignoreFlags) != 0) continue;
+                    if ((tex.Flags & ignoreFlags) != 0 || tex.TexData < 0) continue;
+                    var texData = TexData[tex.TexData];
+                    var uvScale = new Vector2(1f/texData.Width, 1f/texData.Height);
+                    var matName = GetTexdataString(texData.NameStringTableId) + ".vmt";
+                    var mat = World.Resources.LoadVmt(matName).GetMaterial(World.Resources);
+                    mat.SetTexture("_LightMap", lightmap);
 
                     Rect lightmapRect;
                     if (!_lightmapRects.TryGetValue(faceIndex, out lightmapRect))
@@ -317,24 +358,26 @@ namespace VBspViewer.Importing.VBsp
                         }
 
                         for (var x = 0; x < size; ++x)
-                            for (var y = 0; y < size; ++y)
-                            {
-                                var a = GetDisplacementVertex(disp.DispVertStart, x, y,         size, corners, firstCorner);
-                                var b = GetDisplacementVertex(disp.DispVertStart, x, y + 1,     size, corners, firstCorner);
-                                var c = GetDisplacementVertex(disp.DispVertStart, x + 1, y + 1, size, corners, firstCorner);
-                                var d = GetDisplacementVertex(disp.DispVertStart, x + 1, y,     size, corners, firstCorner);
+                        for (var y = 0; y < size; ++y)
+                        {
+                            var a = GetDisplacementVertex(disp.DispVertStart, x, y,         size, corners, firstCorner);
+                            var b = GetDisplacementVertex(disp.DispVertStart, x, y + 1,     size, corners, firstCorner);
+                            var c = GetDisplacementVertex(disp.DispVertStart, x + 1, y + 1, size, corners, firstCorner);
+                            var d = GetDisplacementVertex(disp.DispVertStart, x + 1, y,     size, corners, firstCorner);
 
-                                meshGen.StartFace();
-                                meshGen.AddVertex(a * SourceToUnityUnits, plane.Normal, GetLightmapUv(x, y, size, face, lightmapRect));
-                                meshGen.AddVertex(b * SourceToUnityUnits, plane.Normal, GetLightmapUv(x, y + 1, size, face, lightmapRect));
-                                meshGen.AddVertex(c * SourceToUnityUnits, plane.Normal, GetLightmapUv(x + 1, y + 1, size, face, lightmapRect));
-                                meshGen.AddVertex(d * SourceToUnityUnits, plane.Normal, GetLightmapUv(x + 1, y, size, face, lightmapRect));
-                                meshGen.AddPrimitive(PrimitiveType.TriangleStrip);
-                                meshGen.EndFace();
-                            }
+                            meshGen.StartFace(mat);
+                            meshGen.AddVertex(a * SourceToUnityUnits, plane.Normal, Vector2.zero, GetLightmapUv(x, y, size, face, lightmapRect));
+                            meshGen.AddVertex(b * SourceToUnityUnits, plane.Normal, Vector2.zero, GetLightmapUv(x, y + 1, size, face, lightmapRect));
+                            meshGen.AddVertex(c * SourceToUnityUnits, plane.Normal, Vector2.zero, GetLightmapUv(x + 1, y + 1, size, face, lightmapRect));
+                            meshGen.AddVertex(d * SourceToUnityUnits, plane.Normal, Vector2.zero, GetLightmapUv(x + 1, y, size, face, lightmapRect));
+                            meshGen.AddPrimitive(PrimitiveType.TriangleStrip);
+                            meshGen.EndFace();
+                        }
 
                         continue;
                     }
+
+                    meshGen.StartFace(mat);
 
                     for (var surfId = face.FirstEdge; surfId < face.FirstEdge + face.NumEdges; ++surfId)
                     {
@@ -342,9 +385,10 @@ namespace VBspViewer.Importing.VBsp
                         var edgeIndex = Math.Abs(surfEdge);
                         var edge = Edges[edgeIndex];
                         var vert = Vertices[surfEdge >= 0 ? edge.A : edge.B];
+                        var textureUv = Vector2.Scale(GetUv(vert, tex.TextureUAxis, tex.TextureVAxis), uvScale);
                         var lightmapUv = GetLightmapUv(vert, face, tex, lightmapRect);
 
-                        meshGen.AddVertex((Vector3) vert * SourceToUnityUnits, plane.Normal, lightmapUv);
+                        meshGen.AddVertex((Vector3) vert * SourceToUnityUnits, plane.Normal, textureUv, lightmapUv);
                     }
 
                     if (face.NumPrimitives == 0 || face.NumPrimitives >= 0x8000)
@@ -375,15 +419,27 @@ namespace VBspViewer.Importing.VBsp
 
             meshGen.CopyToMesh(mesh);
 
-            return mesh;
+            return new MeshGroup(mesh, meshGen.GetMaterials());
+        }
+
+        public struct MeshGroup
+        {
+            public readonly Mesh Mesh;
+            public readonly Material[] Materials;
+
+            public MeshGroup(Mesh mesh, Material[] mats)
+            {
+                Mesh = mesh;
+                Materials = mats;
+            }
         }
         
-        public Mesh[] GenerateMeshes(int modelNum)
+        public MeshGroup[] GenerateMeshes(int modelNum)
         {
             var meshGen = new MeshBuilder();
             const int facesPerMesh = 1024;
             
-            var meshes = new List<Mesh>();
+            var meshes = new List<MeshGroup>();
             var model = Models[modelNum];
 
             for (var faceOffset = 0; faceOffset < model.NumFaces; faceOffset += facesPerMesh)
@@ -423,19 +479,24 @@ namespace VBspViewer.Importing.VBsp
             }
         }
 
+        private static KeyValuePair<string, EntValue> KayVal(string key, EntValue value)
+        {
+            return new KeyValuePair<string, EntValue>(key, value);
+        } 
+
         private static IEnumerable<KeyValuePair<string, EntValue>> GetStaticPropKeyVals(StaticPropV10 prop,
             string modelName, string vertexLighting)
         {
-            yield return new KeyValuePair<string, EntValue>("classname", "prop_static");
-            yield return new KeyValuePair<string, EntValue>("hammerid", -1);
-            yield return new KeyValuePair<string, EntValue>("origin", prop.Origin);
-            yield return new KeyValuePair<string, EntValue>("angles", prop.Angles);
-            yield return new KeyValuePair<string, EntValue>("model", modelName);
-            yield return new KeyValuePair<string, EntValue>("vlighting", vertexLighting);
-            yield return new KeyValuePair<string, EntValue>("skin", prop.Skin);
-            yield return new KeyValuePair<string, EntValue>("solid", prop.Solid);
-            yield return new KeyValuePair<string, EntValue>("flags", (int) prop.Flag);
-            yield return new KeyValuePair<string, EntValue>("unknown", string.Format("{0:x2}, {1:x4}, {2:x8}", prop.Unknown0, prop.Unknown1, prop.Unknown2));
+            yield return KayVal("classname", "prop_static");
+            yield return KayVal("hammerid", -1);
+            yield return KayVal("origin", prop.Origin);
+            yield return KayVal("angles", prop.Angles);
+            yield return KayVal("model", modelName);
+            yield return KayVal("vlighting", vertexLighting);
+            yield return KayVal("skin", prop.Skin);
+            yield return KayVal("solid", prop.Solid);
+            yield return KayVal("flags", (int) prop.Flag);
+            yield return KayVal("unknown", string.Format("{0:x2}, {1:x4}, {2:x8}", prop.Unknown0, prop.Unknown1, prop.Unknown2));
         }
 
         public IEnumerable<IEnumerable<KeyValuePair<string, EntValue>>> GetStaticPropKeyVals()
