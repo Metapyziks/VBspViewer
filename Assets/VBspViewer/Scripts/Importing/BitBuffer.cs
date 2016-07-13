@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using System.Security.Permissions;
+using System.Text;
 using UnityEngine;
 
 namespace VBspViewer.Importing
@@ -67,12 +68,12 @@ namespace VBspViewer.Importing
         private uint _bufferDWord;
         private bool _overflow;
 
-        public BitBuffer(byte[] buffer)
+        public BitBuffer(byte[] buffer, int length = -1)
         {
             _buffer = buffer;
             _readOffset = 0;
             _bitsAvailable = 0;
-            _totalBits = buffer.Length << 3;
+            _totalBits = (length == -1 ? buffer.Length : length) << 3;
 
             Seek(0);
         }
@@ -370,6 +371,12 @@ namespace VBspViewer.Importing
             }
         }
 
+        public bool ReadBytes(byte[] buffer, int bytes)
+        {
+            ReadBits(buffer, bytes << 3);
+            return !_overflow;
+        }
+
         public bool ReadOneBit()
         {
             var ret = (_bufferDWord & 1) == 1;
@@ -377,6 +384,49 @@ namespace VBspViewer.Importing
             else _bufferDWord >>= 1;
 
             return ret;
+        }
+
+        public char ReadChar()
+        {
+            return (char) ReadSBitLong(sizeof (byte) << 3);
+        }
+
+        public byte ReadByte()
+        {
+            return (byte) ReadUBitLong(sizeof(byte) << 3);
+        }
+
+        public ushort ReadWord()
+        {
+            return (ushort) ReadUBitLong(sizeof(ushort) << 3);
+        }
+
+        [ThreadStatic]
+        private static StringBuilder _sStringBuilder;
+
+        public string ReadString(int maxLength, bool line = false)
+        {
+            if (_sStringBuilder == null) _sStringBuilder = new StringBuilder(maxLength);
+            else _sStringBuilder.Remove(0, _sStringBuilder.Length);
+
+            var tooSmall = false;
+            var index = 0;
+            while (true)
+            {
+                char val = ReadChar();
+                if (val == 0 || line && val == '\n') break;
+
+                if (index < maxLength - 1)
+                {
+                    _sStringBuilder.Append(val);
+                }
+                else
+                {
+                    tooSmall = true;
+                }
+            }
+
+            return !_overflow && !tooSmall ? _sStringBuilder.ToString() : null;
         }
     }
 }

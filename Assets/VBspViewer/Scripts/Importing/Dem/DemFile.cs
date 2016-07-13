@@ -165,11 +165,30 @@ namespace VBspViewer.Importing.Dem
         [ThreadStatic]
         private static MemoryStream _sDemoRecordStream;
 
+        private const int RecordBufferSize = 2*1024*1024;
+
+        private void HandleDemoRecord(Action<byte[], int> handler)
+        {
+            if (_sDemoRecordBuffer == null)
+            {
+                _sDemoRecordBuffer = new byte[RecordBufferSize];
+            }
+
+            var length = _reader.ReadInt32();
+            _reader.BaseStream.Read(_sDemoRecordBuffer, 0, length);
+
+            handler(_sDemoRecordBuffer, length);
+        }
+
         private void HandleDemoRecord(Action<Stream> handler)
         {
             if (_sDemoRecordBuffer == null)
             {
-                _sDemoRecordBuffer = new byte[2 * 1024 * 1024];
+                _sDemoRecordBuffer = new byte[RecordBufferSize];
+            }
+
+            if (_sDemoRecordStream == null)
+            {
                 _sDemoRecordStream = new MemoryStream(_sDemoRecordBuffer);
             }
 
@@ -238,9 +257,11 @@ namespace VBspViewer.Importing.Dem
                     return true;
                 case DemoCommand.ConsoleCmd:
                 case DemoCommand.UserCmd:
-                case DemoCommand.StringTables:
                 case DemoCommand.CustomData:
                     ReadRawData(null);
+                    return true;
+                case DemoCommand.StringTables:
+                    HandleDemoRecord(NetClient.HandleStringTables);
                     return true;
                 case DemoCommand.SignOn:
                 case DemoCommand.Packet:

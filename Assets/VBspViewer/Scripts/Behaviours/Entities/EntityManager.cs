@@ -501,7 +501,7 @@ namespace VBspViewer.Behaviours.Entities
                 _fieldIndices.Add(index);
             }
 
-            var props = _serverClasses[(int) ent.ClassId].FlattenedProps;
+            var props = _serverClasses[ent.ClassId].FlattenedProps;
             for (var i = 0; i < _fieldIndices.Count; ++i)
             {
                 var fieldIndex = _fieldIndices[i];
@@ -555,6 +555,14 @@ namespace VBspViewer.Behaviours.Entities
                                 var serialNum = bitBuffer.ReadUBitLong(10);
                                 var ent = AddEntity(newEntity, (int) classId, serialNum);
 
+                                var baselineTable = _netClient.GetStringTable("instancebaseline");
+
+                                byte[] baselineData;
+                                if (baselineTable.TryGetUserData(ent.ClassId.ToString(), out baselineData))
+                                {
+                                    ReadNewEntity(new BitBuffer(baselineData), ent);
+                                }
+
                                 ReadNewEntity(bitBuffer, ent);
                                 break;
                             }
@@ -586,11 +594,15 @@ namespace VBspViewer.Behaviours.Entities
             }
         }
 
+        private NetClient _netClient;
+
         [UsedImplicitly]
         private void Awake()
         {
             var ents = FindObjectsOfType<BaseEntity>();
             var world = (World) ents.First(x => x is World);
+
+            _netClient = world.NetClient;
 
             foreach (var ent in ents)
             {

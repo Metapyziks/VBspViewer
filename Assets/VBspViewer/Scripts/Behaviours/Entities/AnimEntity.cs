@@ -11,6 +11,7 @@ namespace VBspViewer.Behaviours.Entities
     public class AnimEntity : BaseEntity
     {
         private string _curModel;
+        private int _curModelIndex = -1;
 
         private MeshRenderer _renderer;
         private MeshFilter _meshFilter;
@@ -18,10 +19,20 @@ namespace VBspViewer.Behaviours.Entities
         public MeshRenderer Renderer { get { return _renderer; } }
 
         public string Model;
+        public int ModelIndex = -1;
 
         protected virtual Mesh OnGetMesh(MdlFile mdl, int lod)
         {
             return mdl.GetMesh(lod, null);
+        }
+
+        public void SetModelIndex(int index)
+        {
+            if (_curModelIndex == index) return;
+            _curModelIndex = ModelIndex = index;
+
+            var modelTable = World.NetClient.GetStringTable("modelprecache");
+            SetModel(modelTable[index]);
         }
 
         public void SetModel(string mdlPath)
@@ -82,6 +93,19 @@ namespace VBspViewer.Behaviours.Entities
             if (string.IsNullOrEmpty(_curModel)) SetModel(Model);
         }
 
+        protected override void OnReadProperty<TVal>(string name, int index, TVal value)
+        {
+            switch (name)
+            {
+                case "m_nModelIndex":
+                    ModelIndex = (int) (object) value;
+                    break;
+                default:
+                    base.OnReadProperty(name, index, value);
+                    break;
+            }
+        }
+
         protected override void OnKeyVal(string key, EntValue val)
         {
             switch (key)
@@ -98,7 +122,8 @@ namespace VBspViewer.Behaviours.Entities
         [UsedImplicitly]
         private void Update()
         {
-            if (!StringComparer.InvariantCultureIgnoreCase.Equals(Model, _curModel)) SetModel(Model);
+            if (_curModelIndex != ModelIndex) SetModelIndex(ModelIndex);
+            else if (!StringComparer.InvariantCultureIgnoreCase.Equals(Model, _curModel)) SetModel(Model);
         }
     }
 }

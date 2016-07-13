@@ -5,12 +5,11 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using Assets.VBspViewer.Scripts.Importing.Dem;
 using JetBrains.Annotations;
-using SilentOrbit.ProtocolBuffers;
 using UnityEngine;
 using VBspViewer.Behaviours.Entities;
 using VBspViewer.Importing;
-using VBspViewer.Importing.Dem;
 using VBspViewer.Importing.Dem.Generated;
 
 namespace VBspViewer.Behaviours
@@ -350,6 +349,50 @@ namespace VBspViewer.Behaviours
             Debug.Log(builder);
         }
 
+        private readonly Dictionary<string, StringTable> _stringTables = new Dictionary<string, StringTable>();
+
+        public StringTable GetStringTable(string name)
+        {
+            return _stringTables[name];
+        }
+
+        private void ReadStringTables(BitBuffer buffer)
+        {
+            var numTables = buffer.ReadByte();
+            for (var i = 0; i < numTables; ++i)
+            {
+                var tableName = buffer.ReadString(256);
+
+                StringTable stringTable;
+                if (!_stringTables.TryGetValue(tableName, out stringTable))
+                {
+                    stringTable = new StringTable();
+                    _stringTables.Add(tableName, stringTable);
+                }
+
+                stringTable.Read(buffer);
+            }
+        }
+
+        public void HandleStringTables(byte[] bytes, int length)
+        {
+            var buffer = new BitBuffer(bytes, length);
+
+            ReadStringTables(buffer);
+        }
+
+        [PacketHandler]
+        private void HandlePacket(CSVCMsgCreateStringTable message)
+        {
+            Debug.Log("FUCK");
+        }
+
+        [PacketHandler]
+        private void HandlePacket(CSVCMsgUpdateStringTable message)
+        {
+            Debug.Log("THAT");
+        }
+            
         [PacketHandler]
         private void HandlePacket(CSVCMsgSendTable message)
         {
