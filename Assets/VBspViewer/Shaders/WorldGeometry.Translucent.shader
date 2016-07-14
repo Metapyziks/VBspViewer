@@ -17,6 +17,9 @@
 
         LOD 200
 
+        ZWrite Off
+        Blend SrcAlpha OneMinusSrcAlpha
+
         Pass
         {
             CGPROGRAM

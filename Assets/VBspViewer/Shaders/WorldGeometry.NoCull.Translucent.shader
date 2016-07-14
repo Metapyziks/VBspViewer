@@ -17,10 +17,12 @@
 
         LOD 200
 
+        Cull Off
+        ZWrite Off
+        Blend SrcAlpha OneMinusSrcAlpha
+
         Pass
         {
-            Cull Off
-
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
