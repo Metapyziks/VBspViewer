@@ -27,7 +27,7 @@ namespace VBspViewer.Behaviours.Entities
             switch (name)
             {
                 case "m_nModelIndex":
-                    ModelIndex = (int) (object) value - 1;
+                    ModelIndex = (int) (object) value;
                     return;
                 default:
                     base.OnReadProperty(name, index, value);
@@ -40,10 +40,21 @@ namespace VBspViewer.Behaviours.Entities
             base.OnStart();
 
             if (ModelIndex < 0) return;
-            
             if (World == null || World.BspFile == null) return;
 
-            var meshes = World.BspFile.GenerateMeshes(ModelIndex);
+            var worldModelIndex = ModelIndex;
+
+            if (ModelIndex > 0)
+            {
+                var modelTable = World.NetClient.GetStringTable("modelprecache");
+                var modelName = modelTable[ModelIndex];
+
+                if (!modelName.StartsWith("*")) return;
+
+                worldModelIndex = int.Parse(modelName.Substring(1));
+            }
+
+            var meshes = World.BspFile.GenerateMeshes(worldModelIndex);
             foreach (var group in meshes)
             {
                 if (group.Mesh.vertexCount == 0) continue;
