@@ -10,6 +10,8 @@ using UnityEngine;
 using VBspViewer.Behaviours.Entities;
 using VBspViewer.Importing.Entities;
 using VBspViewer.Importing.VBsp.Structures;
+using VBspViewer.Importing.Vmt;
+using Object = UnityEngine.Object;
 using Plane = VBspViewer.Importing.VBsp.Structures.Plane;
 using PrimitiveType = VBspViewer.Importing.VBsp.Structures.PrimitiveType;
 
@@ -153,12 +155,127 @@ namespace VBspViewer.Importing.VBsp
         [Lump(Type = LumpType.LUMP_TEXDATA_STRING_TABLE)]
         private int[] TexdataStringTable { get; set; }
 
-        private GameLumpInfo[] GameLumps { get; set; }
-        
-        private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>();
+        [Lump(Type = LumpType.LUMP_LEAFS)]
+        private Leaf[] Leaves { get; set; }
+
+        [Lump(Type = LumpType.LUMP_LEAF_AMBIENT_INDEX_HDR)]
+        private AmbientIndex[] AmbientIndicesHdr { get; set; }
+
+        [Lump(Type = LumpType.LUMP_LEAF_AMBIENT_LIGHTING_HDR)]
+        private AmbientLighting[] AmbientLightingHdr { get; set; }
 
         public PakFile PakFile { get; private set; }
 
+        private GameLumpInfo[] GameLumps { get; set; }
+
+        private Color[][] _ambientLightCubes;
+
+        private void PlaceAmbientDebugObjects()
+        {
+            const float fracScale = 1f/256f;
+
+            var cubeObj = GameObject.CreatePrimitive(UnityEngine.PrimitiveType.Cube);
+            var cube = cubeObj.GetComponent<MeshFilter>().sharedMesh;
+            Object.Destroy(cubeObj);
+
+            var mat = Object.Instantiate(VmtFile.GetDefaultMaterial(false));
+            mat.EnableKeyword("AMBIENT_CUBE");
+
+            var props = new MaterialPropertyBlock();
+            
+            for (var leafIndex = 0; leafIndex < Leaves.Length; ++leafIndex)
+            {
+                var leaf = Leaves[leafIndex];
+                var indices = AmbientIndicesHdr[leafIndex];
+                var min = new Vector3(leaf.MinX, leaf.MinY, leaf.MinZ);
+                var size = new Vector3(leaf.MaxX, leaf.MaxY, leaf.MaxZ) - min;
+
+                for (var index = indices.FirstSample; index < indices.FirstSample + indices.SampleCount; ++index)
+                {
+                    var sample = AmbientLightingHdr[index];
+                    var samplePos = min + Vector3.Scale(new Vector3(sample.X, sample.Y, sample.Z) * fracScale, size);
+
+                    var obj = new GameObject("Ambient[" + leafIndex + "," + index + "]");
+                    obj.transform.position = new Vector3(samplePos.x, samplePos.z, samplePos.y)*SourceToUnityUnits;
+                    obj.transform.localScale = Vector3.one * 0.25f;
+                    obj.AddComponent<MeshFilter>().sharedMesh = cube;
+
+                    var mr = obj.AddComponent<MeshRenderer>();
+                    mr.sharedMaterial = mat;
+
+                    var samples = _ambientLightCubes[index];
+                    for (var i = 0; i < 6; ++i)
+                    {
+                        props.SetColor("_AmbientCube" + i, samples[i]);
+                    }
+
+                    mr.SetPropertyBlock(props);
+                }
+            }
+        }
+
+        public Color[] GetNearestAmbientLightCube(Vector3 pos, out Vector3 cubePos)
+        {
+            if (_ambientLightCubes == null)
+            {
+                _ambientLightCubes = new Color[AmbientLightingHdr.Length][];
+                for (var i = 0; i < AmbientLightingHdr.Length; ++i)
+                {
+                    var orig = AmbientLightingHdr[i];
+                    var cube = _ambientLightCubes[i] = new Color[6];
+
+                    for (var j = 0; j < 6; ++j)
+                    {
+                        var origVal = orig.Cube[j];
+                        cube[j] = new Color32(origVal.R, origVal.G, origVal.B, 255);
+                    }
+                }
+
+               //PlaceAmbientDebugObjects();
+            }
+
+            const int maxDist = 1024;
+            const float fracScale = 1f/256f;
+            const float scale = 1f/SourceToUnityUnits;
+
+            var sourcePos = new Vector3(pos.x * scale, pos.z * scale, pos.y * scale);
+
+            var closestDist2 = (float) maxDist * maxDist;
+            var closestIndex = -1;
+
+            cubePos = default(Vector3);
+
+            for (var leafIndex = 0; leafIndex < Leaves.Length; ++leafIndex)
+            {
+                var leaf = Leaves[leafIndex];
+
+                if (sourcePos.x < leaf.MinX - maxDist || sourcePos.x > leaf.MaxX + maxDist) continue;
+                if (sourcePos.y < leaf.MinY - maxDist || sourcePos.y > leaf.MaxY + maxDist) continue;
+                if (sourcePos.z < leaf.MinZ - maxDist || sourcePos.z > leaf.MaxZ + maxDist) continue;
+
+                var indices = AmbientIndicesHdr[leafIndex];
+                var min = new Vector3(leaf.MinX, leaf.MinY, leaf.MinZ);
+                var size = new Vector3(leaf.MaxX, leaf.MaxY, leaf.MaxZ) - min;
+
+                for (var index = indices.FirstSample; index < indices.FirstSample + indices.SampleCount; ++index)
+                {
+                    var sample = AmbientLightingHdr[index];
+                    var samplePos = min + Vector3.Scale(new Vector3(sample.X, sample.Y, sample.Z) * fracScale, size);
+                    var dist2 = (samplePos - sourcePos).sqrMagnitude;
+
+                    if (dist2 >= closestDist2) continue;
+
+                    closestDist2 = dist2;
+                    closestIndex = index;
+
+                    cubePos = new Vector3(samplePos.x, samplePos.z, samplePos.y) * SourceToUnityUnits;
+                }
+            }
+
+            return closestIndex == -1 ? null : _ambientLightCubes[closestIndex];
+        }
+
+        private readonly Dictionary<int, Rect> _lightmapRects = new Dictionary<int, Rect>();
         private Texture2D _lightmap;
 
         public Texture2D GetLightmap()

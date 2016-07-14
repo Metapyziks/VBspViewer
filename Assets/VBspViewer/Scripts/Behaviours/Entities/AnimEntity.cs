@@ -12,6 +12,7 @@ namespace VBspViewer.Behaviours.Entities
     {
         private string _curModel;
         private int _curModelIndex = -1;
+        private bool _foundAmbientLighting;
 
         private MeshRenderer _renderer;
         private MeshFilter _meshFilter;
@@ -20,6 +21,8 @@ namespace VBspViewer.Behaviours.Entities
 
         public string Model;
         public int ModelIndex = -1;
+
+        public bool UseLeafAmbientLighting = true;
 
         protected virtual Mesh OnGetMesh(MdlFile mdl, int lod)
         {
@@ -93,6 +96,25 @@ namespace VBspViewer.Behaviours.Entities
             if (string.IsNullOrEmpty(_curModel)) SetModel(Model);
         }
 
+        private void UpdateLeafAmbientLighting()
+        {
+            Vector3 cubePos;
+            var nearest = World.BspFile.GetNearestAmbientLightCube(transform.position, out cubePos);
+            if (nearest == null) return;
+
+            var debug = new GameObject("Ambient");
+            debug.transform.SetParent(transform, false);
+            debug.transform.position = cubePos;
+
+            var mat = _renderer.material;
+
+            mat.EnableKeyword("AMBIENT_CUBE");
+            for (var i = 0; i < 6; ++i)
+            {
+                mat.SetColor("_AmbientCube" + i, nearest[i]);
+            }
+        }
+
         protected override void OnReadProperty<TVal>(string name, int index, TVal value)
         {
             switch (name)
@@ -124,6 +146,12 @@ namespace VBspViewer.Behaviours.Entities
         {
             if (_curModelIndex != ModelIndex) SetModelIndex(ModelIndex);
             else if (!StringComparer.InvariantCultureIgnoreCase.Equals(Model, _curModel)) SetModel(Model);
+
+            if (UseLeafAmbientLighting && !_foundAmbientLighting)
+            {
+                _foundAmbientLighting = true;
+                UpdateLeafAmbientLighting();
+            }
         }
     }
 }

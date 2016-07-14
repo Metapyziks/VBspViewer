@@ -384,13 +384,13 @@ namespace VBspViewer.Behaviours
         [PacketHandler]
         private void HandlePacket(CSVCMsgCreateStringTable message)
         {
-            Debug.Log("FUCK");
+            Debug.LogFormat("CreateStringTable: {0}", message.Name);
         }
 
         [PacketHandler]
         private void HandlePacket(CSVCMsgUpdateStringTable message)
         {
-            Debug.Log("THAT");
+            Debug.LogFormat("UpdateStringTable: {0}", message.TableId);
         }
             
         [PacketHandler]

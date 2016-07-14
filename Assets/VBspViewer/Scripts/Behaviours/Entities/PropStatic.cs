@@ -9,6 +9,11 @@ namespace VBspViewer.Behaviours.Entities
     {
         public string VertexLighting;
 
+        public PropStatic()
+        {
+            UseLeafAmbientLighting = false;
+        }
+
         protected override void OnKeyVal(string key, EntValue val)
         {
             switch (key)

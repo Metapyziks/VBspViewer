@@ -21,5 +21,15 @@ namespace VBspViewer.Importing.VBsp.Structures
         public byte G;
         public byte B;
         public sbyte Exponent;
+
+        public Color ToColor()
+        {
+            var mul = (float) Math.Pow(2d, Exponent);
+            return new Color(
+                R*mul,
+                G*mul,
+                B*mul,
+                1f);
+        }
     }
 }

@@ -10,6 +10,15 @@ half _Glossiness;
 half _Metallic;
 fixed4 _Color;
 
+#ifdef AMBIENT_CUBE
+fixed3 _AmbientCube0;
+fixed3 _AmbientCube1;
+fixed3 _AmbientCube2;
+fixed3 _AmbientCube3;
+fixed3 _AmbientCube4;
+fixed3 _AmbientCube5;
+#endif
+
 #ifdef TREE_SWAY
 float _TreeSwayStartHeight;
 float _TreeSwayHeight;
@@ -41,6 +50,20 @@ void vert( inout appdata_full v, out Input o )
 
     o.uv_MainTex = v.texcoord;
     o.VertColor = v.color;
+
+#ifdef AMBIENT_CUBE
+    float3 normal = normalize( mul( unity_ObjectToWorld, v.normal ).xyz );
+    fixed3 ambient = fixed3( 0.5, 0.5, 0.5 );
+
+    ambient += pow(max( 0, +normal.x ),2) * _AmbientCube0 * 0.5;
+    ambient += pow(max( 0, -normal.x ),2) * _AmbientCube1 * 0.5;
+    ambient += pow(max( 0, -normal.z ),2) * _AmbientCube2 * 0.5;
+    ambient += pow(max( 0, +normal.z ),2) * _AmbientCube3 * 0.5;
+    ambient += pow(max( 0, +normal.y ),2) * _AmbientCube4 * 0.5;
+    ambient += pow(max( 0, -normal.y ),2) * _AmbientCube5 * 0.5;
+
+    o.VertColor *= ambient * fixed3(0.25, 0.25, 0.25);
+#endif
 }
 
 void surf( Input IN, inout SurfaceOutputStandard o )
